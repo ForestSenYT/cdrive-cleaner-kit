@@ -62,6 +62,7 @@ public sealed class RuleItem : ObservableObject
     private IReadOnlyList<SourceItem>? _sources;
     private RuleCleanResult? _lastClean;
     private double _barFraction;
+    private (long Files, long Bytes)? _kept;
 
     public RuleItem(Rule rule, GroupItem group, Action changed)
     {
@@ -91,8 +92,8 @@ public sealed class RuleItem : ObservableObject
 
     public bool IsRecycleBin => Rule.Kind == RuleKind.RecycleBin;
 
-    /// <summary>Sources the user chose to keep, by <see cref="Source.Key"/>. Survives a rescan.</summary>
-    public HashSet<string> KeptKeys { get; } = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>The places the user chose to keep. Recorded as paths, so they mean the same files after a rescan.</summary>
+    public KeptPlaces Kept { get; } = new();
 
     public bool IsChecked
     {
@@ -113,28 +114,32 @@ public sealed class RuleItem : ObservableObject
         {
             _scan = value;
             _sources = null;
+            _kept = null;
             RaiseAll();
         }
     }
 
     public bool IsScanned => _scan is not null;
 
-    /// <summary>Scanned and nothing to free on this computer.</summary>
-    public bool IsEmpty => _scan is { Files: 0, Bytes: 0 };
+    /// <summary>Scanned, nothing to free on this computer, and nothing to warn about either.</summary>
+    public bool IsEmpty => _scan is { Files: 0, Bytes: 0, Warnings.Count: 0 };
 
     public long Files => _scan?.Files ?? 0;
 
     public long Bytes => _scan?.Bytes ?? 0;
 
-    public long KeptFiles => KeptKeys.Count == 0 ? 0 : Sources.Where(source => !source.IsIncluded).Sum(source => source.Source.Files);
+    public long KeptFiles => CountKept().Files;
 
-    public long KeptBytes => KeptKeys.Count == 0 ? 0 : Sources.Where(source => !source.IsIncluded).Sum(source => source.Source.Bytes);
+    public long KeptBytes => CountKept().Bytes;
 
     public long EffectiveFiles => Files - KeptFiles;
 
     public long EffectiveBytes => Bytes - KeptBytes;
 
-    public string SizeText => IsScanned && !IsEmpty ? ByteSize.Format(EffectiveBytes) : "";
+    /// <summary>Nothing found, though the rule may still have warnings to show.</summary>
+    private bool FoundNothing => _scan is { Files: 0, Bytes: 0 };
+
+    public string SizeText => IsScanned && !FoundNothing ? ByteSize.Format(EffectiveBytes) : "";
 
     public string FilesText
     {
@@ -150,12 +155,20 @@ public sealed class RuleItem : ObservableObject
                 return IsRecycleBin ? "回收站是空的" : "没有找到";
             }
 
+            if (IsRecycleBin && HasWarnings)
+            {
+                return "无法查询回收站";
+            }
+
+            if (FoundNothing)
+            {
+                return "没有找到";
+            }
+
             string count = IsRecycleBin ? $"{Files:N0} 项" : $"{EffectiveFiles:N0} 个文件";
-            return KeptFiles > 0 ? $"{count}，保留 {KeptSourceCount} 处" : count;
+            return KeptFiles > 0 ? $"{count}，保留 {KeptFiles:N0} 个" : count;
         }
     }
-
-    public int KeptSourceCount => KeptKeys.Count == 0 ? 0 : Sources.Count(source => !source.IsIncluded);
 
     /// <summary>Share of the largest rule, for the thin bar under the size.</summary>
     public double BarFraction
@@ -243,22 +256,54 @@ public sealed class RuleItem : ObservableObject
 
     public bool HasSources => !IsRecycleBin && _scan is { Files: > 0 };
 
-    /// <summary>The files to leave alone in this rule, for <see cref="CleanExclusions"/>.</summary>
-    public IEnumerable<ScannedFile> KeptFileList =>
-        KeptKeys.Count == 0 ? [] : Sources.Where(source => !source.IsIncluded).SelectMany(source => source.Source.FileList);
+    /// <summary>The files of this scan to leave alone, for <see cref="CleanExclusions"/>.</summary>
+    public IReadOnlyList<ScannedFile> KeptFileList =>
+        Kept.IsEmpty || _scan is not { } scan ? [] : scan.FileList.Where(Kept.Keeps).ToList();
 
     internal void SourcesChanged()
     {
+        _kept = null;
+        foreach (var source in _sources ?? [])
+        {
+            source.Refresh();
+        }
+
         Raise(nameof(KeptFiles), nameof(KeptBytes), nameof(EffectiveFiles), nameof(EffectiveBytes), nameof(SizeText),
-            nameof(FilesText), nameof(KeptSourceCount));
+            nameof(FilesText));
         _changed();
+    }
+
+    /// <summary>Counted file by file against the kept places, so a source that is only partly kept counts right.</summary>
+    private (long Files, long Bytes) CountKept()
+    {
+        if (_kept is { } cached)
+        {
+            return cached;
+        }
+
+        long files = 0;
+        long bytes = 0;
+        if (!Kept.IsEmpty && _scan is { } scan)
+        {
+            foreach (var file in scan.FileList)
+            {
+                if (Kept.Keeps(file))
+                {
+                    files++;
+                    bytes += file.Size;
+                }
+            }
+        }
+
+        _kept = (files, bytes);
+        return (files, bytes);
     }
 
     private void RaiseAll() => Raise(
         nameof(Scan), nameof(IsScanned), nameof(IsEmpty), nameof(Files), nameof(Bytes), nameof(KeptFiles), nameof(KeptBytes),
         nameof(EffectiveFiles), nameof(EffectiveBytes), nameof(SizeText), nameof(FilesText), nameof(StatsText),
         nameof(SkippedText), nameof(HasSkipped), nameof(WarningLines), nameof(HasWarnings), nameof(Sources),
-        nameof(HasSources), nameof(StatusText), nameof(HasStatus), nameof(KeptSourceCount));
+        nameof(HasSources), nameof(StatusText), nameof(HasStatus));
 }
 
 public sealed class SourceItem : ObservableObject
@@ -293,19 +338,33 @@ public sealed class SourceItem : ObservableObject
 
     public double Fraction { get; }
 
-    public bool IsIncluded
+    /// <summary>True: cleaned. False: kept. Null: some of its places are kept (after a rescan regrouped them).</summary>
+    public bool? IsIncluded
     {
-        get => !_rule.KeptKeys.Contains(Source.Key);
+        get => _rule.Kept.Covers(Source) switch { true => false, false => true, null => null };
         set
         {
-            bool changed = value ? _rule.KeptKeys.Remove(Source.Key) : _rule.KeptKeys.Add(Source.Key);
-            if (changed)
+            if (value is not { } include || include == IsIncluded)
             {
-                Raise();
-                _rule.SourcesChanged();
+                return;
             }
+
+            if (include)
+            {
+                _rule.Kept.Release(Source);
+            }
+            else
+            {
+                _rule.Kept.Keep(Source);
+            }
+
+            _rule.SourcesChanged();
         }
     }
+
+    public bool IsPartlyKept => IsIncluded is null;
+
+    internal void Refresh() => Raise(nameof(IsIncluded), nameof(IsPartlyKept));
 
     public bool HasMaybeUseful => Source.MaybeUseful.Count > 0;
 

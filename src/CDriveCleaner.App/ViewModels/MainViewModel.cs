@@ -52,6 +52,9 @@ public sealed class MainViewModel : ObservableObject
     private bool _showEmpty;
     private CancellationTokenSource? _cancellation;
 
+    /// <summary>A clean ran after the last scan, so the scan's file lists describe files that may now be gone or new.</summary>
+    private bool _scanOutdated;
+
     public MainViewModel(string rulesPath, bool shippedRules)
     {
         RulesPath = rulesPath;
@@ -110,7 +113,7 @@ public sealed class MainViewModel : ObservableObject
 
     public bool CanScan => IsIdle && Rules is not null;
 
-    public bool CanClean => IsIdle && _scan is not null && SelectedBytes + SelectedRecycleItems > 0;
+    public bool CanClean => IsIdle && _scan is not null && !_scanOutdated && SelectedBytes + SelectedRecycleItems > 0;
 
     public string Status
     {
@@ -282,6 +285,7 @@ public sealed class MainViewModel : ObservableObject
         {
             var started = DateTime.UtcNow;
             _scan = await Task.Run(() => new Scanner().Scan(rules, progress, cancellation.Token));
+            _scanOutdated = false;
             foreach (var item in Items)
             {
                 item.Scan = _scan.Find(item.Rule.Id);
@@ -302,7 +306,7 @@ public sealed class MainViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
-            Status = "扫描已取消。";
+            Status = _scanOutdated ? "扫描已取消。上次清理之后还没有重新扫描，请先扫描再清理。" : "扫描已取消。";
         }
         catch (Exception error)
         {
@@ -324,7 +328,7 @@ public sealed class MainViewModel : ObservableObject
 
         var chosen = Checked.ToList();
         var ids = chosen.Select(item => item.Rule.Id).ToHashSet(StringComparer.Ordinal);
-        var exclusions = CleanExclusions.From(chosen.Select(item => (item.Rule.Id, item.KeptFileList)));
+        var exclusions = CleanExclusions.From(chosen.Select(item => (item.Rule.Id, (IEnumerable<ScannedFile>)item.KeptFileList)));
         CleanReport report;
         using (var cancellation = Begin(Busy.Cleaning, "正在清理…"))
         {
@@ -340,12 +344,16 @@ public sealed class MainViewModel : ObservableObject
             }
             catch (Exception error)
             {
-                Status = $"清理出错：{error.Message}";
+                // Some files may be gone already; the lists must be rebuilt before another clean.
+                _scanOutdated = true;
+                Status = $"清理出错：{error.Message}。请重新扫描后再清理。";
                 End();
                 return;
             }
         }
 
+        // Whatever happens to the rescan below, never clean again from these file lists.
+        _scanOutdated = true;
         End();
         foreach (var item in Items)
         {
@@ -365,7 +373,10 @@ public sealed class MainViewModel : ObservableObject
             + $"释放了 {ByteSize.Format(report.TotalDeletedBytes)}，删除 {report.TotalDeletedFiles:N0} 个文件。"
             + (failed > 0 ? $"{failed:N0} 个文件正在使用或没有权限，留在原处。" : "");
         await ScanAsync(morph: true);
-        Status = ResultText;
+        if (!_scanOutdated)
+        {
+            Status = ResultText;
+        }
     }
 
     public void Cancel() => _cancellation?.Cancel();

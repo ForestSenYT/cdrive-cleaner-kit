@@ -33,10 +33,11 @@ public partial class MainWindow : Window
                 await _model.ScanAsync();
             }
         };
-        // Space on a highlighted row ticks it, as it would on the check box itself.
-        RuleList.KeyDown += (_, e) =>
+        // Space on a highlighted row ticks it, as it would on the check box itself. Preview, because the list box
+        // handles Space for its own selection before an ordinary KeyDown handler would see it.
+        RuleList.PreviewKeyDown += (_, e) =>
         {
-            if (e.Key == Key.Space && _model.Selected is { } item && e.OriginalSource is ListBoxItem)
+            if (e.Key == Key.Space && _model.IsIdle && _model.Selected is { } item && e.OriginalSource is ListBoxItem)
             {
                 item.IsChecked = !item.IsChecked;
                 e.Handled = true;
@@ -96,10 +97,10 @@ public partial class MainWindow : Window
 
         long bytes = chosen.Sum(item => item.EffectiveBytes);
         var notes = new List<string>();
-        int keptSources = chosen.Sum(item => item.KeptSourceCount);
-        if (keptSources > 0)
+        long keptFiles = chosen.Sum(item => item.KeptFiles);
+        if (keptFiles > 0)
         {
-            notes.Add($"你取消勾选的 {keptSources} 处来源（{ByteSize.Format(chosen.Sum(item => item.KeptBytes))}）会保留。");
+            notes.Add($"你取消勾选的来源里的 {keptFiles:N0} 个文件（{ByteSize.Format(chosen.Sum(item => item.KeptBytes))}）会保留。");
         }
 
         var medium = chosen.Where(item => item.IsMedium).ToList();

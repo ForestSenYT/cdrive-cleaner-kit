@@ -44,24 +44,20 @@ public sealed class CleanHistory
     public static string DefaultPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CDriveCleaner", "history.json");
 
-    public IReadOnlyList<HistoryEntry> Load()
-    {
-        try
-        {
-            using var stream = File.OpenRead(_path);
-            return JsonSerializer.Deserialize(stream, HistoryJson.Default.ListHistoryEntry) ?? [];
-        }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
-        {
-            return [];
-        }
-    }
+    public IReadOnlyList<HistoryEntry> Load() => Read().Entries;
 
     /// <returns>The history including <paramref name="entry"/>, newest first.</returns>
     public IReadOnlyList<HistoryEntry> Add(HistoryEntry entry)
     {
+        var (past, writable) = Read();
         var entries = new List<HistoryEntry> { entry };
-        entries.AddRange(Load().Take(MaxEntries - 1));
+        entries.AddRange(past.Take(MaxEntries - 1));
+        if (!writable)
+        {
+            // The file exists but could not be read just now; writing would replace everything in it.
+            return entries;
+        }
+
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
@@ -80,6 +76,43 @@ public sealed class CleanHistory
 
         return entries;
     }
+
+    /// <summary>The valid entries, and whether writing the file back would lose nothing that could have been read.</summary>
+    private (List<HistoryEntry> Entries, bool Writable) Read()
+    {
+        try
+        {
+            using var stream = File.OpenRead(_path);
+            var entries = JsonSerializer.Deserialize(stream, HistoryJson.Default.ListHistoryEntry) ?? [];
+            return (entries.Where(IsValid).ToList(), true);
+        }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return ([], true);
+        }
+        catch (JsonException)
+        {
+            // Unreadable for good: keep a copy for whoever wants to look, then start afresh.
+            try
+            {
+                File.Copy(_path, _path + ".damaged", overwrite: true);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                return ([], false);
+            }
+
+            return ([], true);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return ([], false);
+        }
+    }
+
+    /// <summary>Valid JSON can still carry nulls where an entry or a rule should be; such entries are skipped.</summary>
+    private static bool IsValid(HistoryEntry? entry) =>
+        entry?.Rules is not null && entry.Rules.All(rule => rule is { Id: not null, Name: not null });
 }
 
 [JsonSourceGenerationOptions(WriteIndented = true, PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]

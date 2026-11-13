@@ -33,7 +33,8 @@
                     <ColumnDefinition Width="132" />
                 </Grid.ColumnDefinitions>
                 <CheckBox IsChecked="{Binding IsChecked}" MinWidth="0" MinHeight="0" Padding="0" Margin="0,-6,10,-6"
-                          VerticalAlignment="Top" AutomationProperties.Name="{Binding Name, StringFormat=清理 {0}}" />
+                          VerticalAlignment="Top" AutomationProperties.Name="{Binding Name, StringFormat=清理 {0}}"
+                          IsEnabled="{Binding DataContext.IsIdle, RelativeSource={RelativeSource AncestorType=Window}}" />
                 <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="0,0,0,0">
                     <TextBlock Text="{Binding Name}" FontSize="14" TextTrimming="CharacterEllipsis"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
@@ -78,12 +79,16 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <CheckBox IsChecked="{Binding IsIncluded}" MinWidth="0" MinHeight="0" Padding="0" Margin="0,-6,8,-6" VerticalAlignment="Top"
-                          AutomationProperties.Name="{Binding AutomationName}" />
+                          AutomationProperties.Name="{Binding AutomationName}"
+                          IsEnabled="{Binding DataContext.IsIdle, RelativeSource={RelativeSource AncestorType=Window}}" />
                 <StackPanel Grid.Column="1">
                     <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="13.5" TextTrimming="CharacterEllipsis"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="{Binding FolderToOpen}" />
                     <TextBlock Text="{Binding OwnerHint}" Style="{StaticResource Secondary}"
                                Visibility="{Binding OwnerHint, Converter={StaticResource HasText}}" />
+                    <TextBlock Text="其中一部分文件夹你已选择保留" Style="{StaticResource Secondary}"
+                               Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                               Visibility="{Binding IsPartlyKept, Converter={StaticResource Shown}}" />
                 </StackPanel>
                 <TextBlock Grid.Column="2" Text="{Binding SizeText}" Style="{StaticResource Amount}" FontSize="13.5" Margin="12,0,0,0" />
 

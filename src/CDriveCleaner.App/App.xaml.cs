@@ -26,6 +26,11 @@ public partial class App : Application
             MessageBox.Show($"程序出错：{args.Exception.Message}{Environment.NewLine}详情已写入 {CrashLogPath}",
                 Texts.AppTitle, MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true;
+            if (MainWindow is not { IsLoaded: true })
+            {
+                // Failed before the window was up: there is nothing to return to, so do not linger without a window.
+                Shutdown(1);
+            }
         };
         AppDomain.CurrentDomain.UnhandledException += (_, args) => Record(args.ExceptionObject as Exception);
 

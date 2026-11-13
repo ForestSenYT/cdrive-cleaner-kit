@@ -10,7 +10,8 @@ namespace CDriveCleaner.Core.Insights;
 /// <param name="Key">Stable identity inside one rule's breakdown, for remembering what the user chose to keep.</param>
 /// <param name="Label">What people see: the program's name when it is recognised, otherwise the folder name.</param>
 /// <param name="Owner">The recognised program, or null.</param>
-/// <param name="Directories">The folders this source covers; empty for loose files.</param>
+/// <param name="Directories">The folders directly under a scanned root that this source covers.</param>
+/// <param name="LooseRoots">The scanned roots whose loose files (lying directly in the root) belong to this source.</param>
 /// <param name="FileList">The scanned files of this source: the unit that is kept or cleaned together.</param>
 /// <param name="MaybeUseful">Documents, pictures, media, archives and similar personal-looking files, largest first.</param>
 public sealed record Source(
@@ -18,6 +19,7 @@ public sealed record Source(
     string Label,
     string? Owner,
     IReadOnlyList<string> Directories,
+    IReadOnlyList<string> LooseRoots,
     IReadOnlyList<ScannedFile> FileList,
     long Bytes,
     DateTime NewestWriteUtc,
@@ -48,19 +50,29 @@ public static class SourceBreakdown
         ".dwg", ".py", ".ipynb", ".sql", ".epub",
     };
 
+    /// <summary>
+    /// Where a file sits: the folder directly under its scanned root that contains it, or null when the file lies
+    /// directly in the root. This is the unit a user can keep, and it is the same whatever the breakdown looks like.
+    /// </summary>
+    public static string? FolderOf(ScannedFile file)
+    {
+        int start = file.Root.EndsWith(PathText.Separator) ? file.Root.Length : file.Root.Length + 1;
+        int end = start < file.Path.Length ? file.Path.IndexOf(PathText.Separator, start) : -1;
+        return end < 0 ? null : file.Path[..end];
+    }
+
     public static IReadOnlyList<Source> Compute(RuleScanResult result)
     {
         var buckets = new Dictionary<string, Bucket>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in result.FileList)
         {
-            int start = file.Root.EndsWith(PathText.Separator) ? file.Root.Length : file.Root.Length + 1;
-            int end = start < file.Path.Length ? file.Path.IndexOf(PathText.Separator, start) : -1;
-            string key = end < 0 ? LooseKey + file.Root : file.Path[..end];
+            string? folder = FolderOf(file);
+            string key = folder ?? LooseKey + file.Root;
             if (!buckets.TryGetValue(key, out var bucket))
             {
-                bucket = end < 0
-                    ? new Bucket(key, $"直接放在 {FolderName(file.Root)} 里的文件", null)
-                    : new Bucket(key, file.Path[start..end], file.Path[..end]);
+                bucket = folder is null
+                    ? new Bucket(key, $"直接放在 {FolderName(file.Root)} 里的文件", null, file.Root)
+                    : new Bucket(key, FolderName(folder), folder, file.Root);
                 buckets.Add(key, bucket);
             }
 
@@ -117,6 +129,7 @@ public static class SourceBreakdown
                 text,
                 owner?.Name,
                 Parts.Where(part => part.Directory is not null).Select(part => part.Directory!).ToList(),
+                Parts.Where(part => part.Directory is null).Select(part => part.Root).ToList(),
                 files,
                 Bytes,
                 files.Count == 0 ? DateTime.MinValue : files.Max(file => file.LastWriteUtc),
@@ -125,7 +138,7 @@ public static class SourceBreakdown
     }
 
     /// <summary>One folder directly under a root, or the loose files of one root.</summary>
-    private sealed class Bucket(string key, string label, string? directory)
+    private sealed class Bucket(string key, string label, string? directory, string root)
     {
         private readonly string? _folderName = directory is null ? null : label;
 
@@ -134,6 +147,8 @@ public static class SourceBreakdown
         public string Label { get; } = label;
 
         public string? Directory { get; } = directory;
+
+        public string Root { get; } = root;
 
         public List<ScannedFile> Files { get; } = [];
 
