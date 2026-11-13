@@ -28,8 +28,23 @@ public class RuleFileLoaderTests
     {
         string path = Path.Combine(RepositoryRoot(), "cdrive-cleaner-kit", "rules", "rules.json");
         var rules = RuleFileLoader.Load(path);
-        Assert.Equal(13, rules.Rules.Count);
+        Assert.Equal(55, rules.Rules.Count);
         Assert.Equal(RuleKind.RecycleBin, rules.Find("recycle-bin")!.Kind);
+
+        // The original 13 rules keep their ids (the translated table only added rules around them).
+        string[] original =
+        [
+            "user-temp", "system-temp", "service-temp", "store-app-temp", "error-reports", "windows-logs", "crash-dumps",
+            "inet-cache", "rdp-cache", "thumbnail-cache", "prefetch", "update-download", "recycle-bin",
+        ];
+        Assert.All(original, id => Assert.NotNull(rules.Find(id)));
+
+        // Anything with a side effect is opt-in and says what the user gives up.
+        Assert.All(rules.Rules.Where(rule => rule.Risk == RiskLevel.Medium), rule =>
+        {
+            Assert.False(rule.DefaultSelected, rule.Id);
+            Assert.False(string.IsNullOrWhiteSpace(rule.Note), rule.Id);
+        });
     }
 
     [Fact]

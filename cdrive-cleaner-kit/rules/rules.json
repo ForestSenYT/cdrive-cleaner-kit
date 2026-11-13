@@ -48,7 +48,46 @@
       "default_selected": true,
       "kind": "files",
       "min_age_hours": 24,
-      "targets": [{ "root": "%SystemDrive%/Users/*/AppData/Local/Packages/*/AC/Temp" }]
+      "targets": [
+        { "root": "%SystemDrive%/Users/*/AppData/Local/Packages/*/AC/Temp" },
+        { "root": "%SystemDrive%/Users/*/AppData/Local/Packages/*/AC/!*/Temp" }
+      ]
+    },
+    {
+      "id": "winsxs-temp",
+      "name": "WinSxS 临时文件",
+      "group": "临时文件",
+      "description": "系统安装更新时留下的临时文件：WinSxS 里的清单缓存（ManifestCache）和 Windows 目录下的 CbsTemp。",
+      "risk": "low",
+      "default_selected": true,
+      "kind": "files",
+      "min_age_hours": 24,
+      "targets": [
+        { "root": "%SystemRoot%/WinSxS/ManifestCache" },
+        { "root": "%SystemRoot%/CbsTemp" }
+      ]
+    },
+    {
+      "id": "programdata-temp",
+      "name": "ProgramData 临时目录",
+      "group": "临时文件",
+      "description": "ProgramData 下 temp 目录里的文件，腾讯等软件更新时会在这里留下下载残留。",
+      "risk": "low",
+      "default_selected": true,
+      "kind": "files",
+      "min_age_hours": 24,
+      "targets": [{ "root": "%ProgramData%/temp" }]
+    },
+    {
+      "id": "chkdsk-found",
+      "name": "磁盘检查恢复的文件碎片",
+      "group": "临时文件",
+      "description": "磁盘检查（chkdsk）修复文件系统时，把无法归位的数据存成系统盘根目录下 FOUND.000 等目录里的 .CHK 文件。",
+      "note": "这些碎片偶尔是损坏文件仅剩的数据。需要从中找回内容时先保留，删除后无法恢复。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%SystemDrive%/Found.*" }]
     },
     {
       "id": "error-reports",
@@ -69,16 +108,43 @@
       "id": "windows-logs",
       "name": "Windows 日志文件",
       "group": "日志与报告",
-      "description": "系统安装、更新和诊断过程写下的日志。",
+      "description": "系统安装、更新、诊断和磁盘检查过程写下的日志，以及各用户目录下系统组件的日志。",
       "risk": "low",
       "default_selected": true,
       "kind": "files",
       "min_age_hours": 24,
       "targets": [
-        { "root": "%SystemRoot%", "include": ["*.log", "Panther/*.log", "Performance/WinSAT/*.log"] },
+        {
+          "root": "%SystemRoot%",
+          "include": ["*.log", "*log.txt", "SchedLgU.txt", "Panther/*.log", "Performance/WinSAT/*.log"]
+        },
         { "root": "%SystemRoot%/Logs" },
         { "root": "%SystemRoot%/debug" },
-        { "root": "%ProgramData%/USOShared/Logs" }
+        { "root": "%ProgramData%/USOShared/Logs" },
+        { "root": "%SystemRoot%/Performance/WinSAT/DataStore" },
+        { "root": "%SystemRoot%/System32/LogFiles", "include": ["*/*"], "exclude": ["Sum"] },
+        { "root": "%SystemRoot%/System32/WDI/LogFiles/*" },
+        { "root": "%SystemDrive%/Logs" },
+        { "root": "%SystemDrive%/System Volume Information/Chkdsk" },
+        {
+          "root": "%SystemDrive%/Users/*/AppData",
+          "include": [
+            "Local/Microsoft/Windows/*.log",
+            "Local/MigWiz/*.log",
+            "Local/Microsoft/CLR_*/*.log",
+            "Local/Microsoft/CLR_*/*/*.log",
+            "Roaming/Microsoft/Windows/*.log"
+          ]
+        },
+        {
+          "root": "%SystemDrive%/Users/*/AppData/Local/Packages/*/AC",
+          "include": [
+            "Microsoft/CLR_*/*.log",
+            "Microsoft/CLR_*/*/*.log",
+            "!*/Microsoft/CLR_*/*.log",
+            "!*/Microsoft/CLR_*/*/*.log"
+          ]
+        }
       ]
     },
     {
@@ -96,17 +162,99 @@
       ]
     },
     {
+      "id": "event-logs",
+      "name": "Windows 事件日志",
+      "group": "日志与报告",
+      "description": "事件查看器里的系统、应用和安全事件记录（.evtx 文件）。",
+      "note": "删除后事件查看器里的历史事件（包括安全审核记录）就没有了，排查问题时无据可查。系统正在写入的日志会被自动跳过，实际删掉的多是停用通道和存档的日志。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "min_age_hours": 24,
+      "targets": [{ "root": "%SystemRoot%/System32/winevt/Logs" }]
+    },
+    {
+      "id": "update-history",
+      "name": "Windows 更新历史记录",
+      "group": "日志与报告",
+      "description": "Windows 更新保存的安装记录数据库（SoftwareDistribution 下的 DataStore）。",
+      "note": "删除后“更新历史记录”会被清空，Windows 更新下次检查时要重新扫描。更新服务正在使用的文件会被跳过。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%SystemRoot%/SoftwareDistribution/DataStore" }]
+    },
+    {
+      "id": "defender-history",
+      "name": "Windows Defender 保护历史记录",
+      "group": "日志与报告",
+      "description": "Windows Defender 的保护历史记录。记录过多时打开“保护历史记录”页面可能闪退。",
+      "note": "清理后保护历史记录被清空，无法再从中还原被隔离的文件。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%ProgramData%/Microsoft/Windows Defender/Scans/History" }]
+    },
+    {
+      "id": "defender-support",
+      "name": "微软杀毒软件诊断文件",
+      "group": "日志与报告",
+      "description": "Windows Defender、MSE、SCEP 等微软杀毒软件的诊断日志（Support）和 LocalCopy 目录。",
+      "note": "Support 里是诊断日志，删除后排查杀毒软件问题时没有历史日志。LocalCopy 的用途没有公开说明，原规则表把它算作无用文件。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "min_age_hours": 24,
+      "targets": [
+        { "root": "%ProgramData%/Microsoft/Windows Defender/LocalCopy" },
+        { "root": "%ProgramData%/Microsoft/Windows Defender/Support" },
+        { "root": "%ProgramData%/Microsoft/Windows Defender/Network Inspection System/Support" },
+        { "root": "%ProgramData%/Microsoft/Microsoft Antimalware/LocalCopy" },
+        { "root": "%ProgramData%/Microsoft/Microsoft Antimalware/Support" },
+        { "root": "%ProgramData%/Microsoft/Microsoft Antimalware/Network Inspection System/Support" }
+      ]
+    },
+    {
       "id": "inet-cache",
       "name": "系统网页缓存",
       "group": "缓存",
-      "description": "系统网络组件（WinINet）为各账户保存的网页缓存。",
+      "description": "系统网络组件（WinINet）为各账户和应用容器保存的网页缓存，包括旧版 Edge 的缓存。",
       "risk": "low",
       "default_selected": true,
       "kind": "files",
       "targets": [
         { "root": "%SystemDrive%/Users/*/AppData/Local/Microsoft/Windows/INetCache" },
         { "root": "%SystemRoot%/ServiceProfiles/*/AppData/Local/Microsoft/Windows/INetCache" },
-        { "root": "%SystemDrive%/Users/*/AppData/Local/Packages/*/AC/INetCache" }
+        { "root": "%SystemDrive%/Users/*/AppData/Local/Packages/*/AC/INetCache" },
+        { "root": "%SystemRoot%/System32/config/systemprofile/AppData/Local/Microsoft/Windows/INetCache" },
+        { "root": "%SystemRoot%/SysWOW64/config/systemprofile/AppData/Local/Microsoft/Windows/INetCache" },
+        { "root": "%SystemDrive%/Users/*/AppData/Local/Packages/*/AC/!*/INetCache" },
+        { "root": "%SystemDrive%/Users/*/AppData/Local/Packages/*/AC/MicrosoftEdge/Cache" },
+        { "root": "%SystemDrive%/Users/*/AppData/Local/Packages/*/AC/!*/MicrosoftEdge/Cache" }
+      ]
+    },
+    {
+      "id": "inet-cookies",
+      "name": "系统网络组件 Cookie",
+      "group": "缓存",
+      "description": "系统网络组件（WinINet）为各账户和应用容器保存的 Cookie，IE、旧版 Edge 和部分应用商店应用使用它们。",
+      "note": "清理后这些浏览器和应用会退出已登录的网站或账号，需要重新登录。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [
+        { "root": "%SystemDrive%/Users/*/AppData/Local/Microsoft/Windows/INetCookies" },
+        { "root": "%SystemDrive%/Users/*/AppData/Roaming/Microsoft/Windows/Cookies" },
+        { "root": "%SystemRoot%/ServiceProfiles/*/AppData/Local/Microsoft/Windows/INetCookies" },
+        { "root": "%SystemRoot%/ServiceProfiles/*/AppData/Roaming/Microsoft/Windows/Cookies" },
+        { "root": "%SystemRoot%/System32/config/systemprofile/AppData/Local/Microsoft/Windows/INetCookies" },
+        { "root": "%SystemRoot%/System32/config/systemprofile/AppData/Roaming/Microsoft/Windows/Cookies" },
+        { "root": "%SystemRoot%/SysWOW64/config/systemprofile/AppData/Local/Microsoft/Windows/INetCookies" },
+        { "root": "%SystemRoot%/SysWOW64/config/systemprofile/AppData/Roaming/Microsoft/Windows/Cookies" },
+        { "root": "%SystemDrive%/Users/*/AppData/Local/Packages/*/AC/INetCookies" },
+        { "root": "%SystemDrive%/Users/*/AppData/Local/Packages/*/AC/!*/INetCookies" },
+        { "root": "%SystemDrive%/Users/*/AppData/Local/Packages/*/AC/MicrosoftEdge/Cookies" },
+        { "root": "%SystemDrive%/Users/*/AppData/Local/Packages/*/AC/!*/MicrosoftEdge/Cookies" }
       ]
     },
     {
@@ -132,7 +280,8 @@
         {
           "root": "%SystemDrive%/Users/*/AppData/Local/Microsoft/Windows/Explorer",
           "include": ["thumbcache_*.db", "iconcache_*.db"]
-        }
+        },
+        { "root": "%SystemDrive%/Users/*/AppData/Local", "include": ["IconCache.db"] }
       ]
     },
     {
@@ -156,6 +305,429 @@
       "default_selected": false,
       "kind": "files",
       "targets": [{ "root": "%SystemRoot%/SoftwareDistribution/Download" }]
+    },
+    {
+      "id": "delivery-optimization",
+      "name": "传递优化缓存",
+      "group": "缓存",
+      "description": "传递优化服务下载 Windows 更新和应用商店应用时留下的缓存，也用来向其他电脑分享这些下载。",
+      "risk": "low",
+      "default_selected": false,
+      "kind": "files",
+      "min_age_hours": 24,
+      "targets": [
+        { "root": "%SystemRoot%/SoftwareDistribution/DeliveryOptimization" },
+        { "root": "%SystemRoot%/ServiceProfiles/NetworkService/AppData/Local/Microsoft/Windows/DeliveryOptimization/Cache" }
+      ]
+    },
+    {
+      "id": "retail-demo",
+      "name": "零售演示离线内容",
+      "group": "缓存",
+      "description": "Windows 零售演示模式（商店里的展示机）缓存的离线内容，普通电脑用不到。",
+      "risk": "low",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%ProgramData%/Microsoft/Windows/RetailDemo" }]
+    },
+    {
+      "id": "windows-old",
+      "name": "以前的 Windows 安装",
+      "group": "系统备份与回滚",
+      "description": "系统升级或重置后在系统盘根目录留下的旧系统备份（Windows.old）。",
+      "note": "删除后无法回退到以前的 Windows 版本。旧系统里的用户文件（Windows.old 下的 Users 目录）也会一起删除，先确认需要的文件已经取回。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%SystemDrive%/Windows.old*" }]
+    },
+    {
+      "id": "windows-setup-temp",
+      "name": "Windows 升级临时文件",
+      "group": "系统备份与回滚",
+      "description": "系统升级或还原时在系统盘根目录建立的 $Windows.~BT、$Windows.~WS、$Windows.~LS 临时安装文件。",
+      "note": "正在进行或等待重启完成的系统升级会失败；升级后的回退期内，回退也要用到这里的文件，删除后无法回退。确定当前没有在升级或还原时再清理。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [
+        { "root": "%SystemDrive%/$Windows.~BT" },
+        { "root": "%SystemDrive%/$Windows.~WS" },
+        { "root": "%SystemDrive%/$Windows.~LS" }
+      ]
+    },
+    {
+      "id": "windows-dir-backups",
+      "name": "Windows 目录下的 .bak 文件",
+      "group": "系统备份与回滚",
+      "description": "直接放在 Windows 目录里的 .bak 备份文件，多是程序修改系统配置文件前留下的。",
+      "note": "删除后无法再用这些备份恢复被修改的原文件。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%SystemRoot%", "include": ["*.bak"] }]
+    },
+    {
+      "id": "startup-backup",
+      "name": "启动信息备份（pss）",
+      "group": "系统备份与回滚",
+      "description": "Windows 目录下 pss 文件夹里的备份。原规则表说明是修改启动信息后系统留下的备份；系统配置（msconfig）停用启动文件夹里的项目时也把它们移到这里。",
+      "note": "删除后无法再用这些备份回滚，在系统配置里停用的启动项也无法再恢复。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%SystemRoot%/pss" }]
+    },
+    {
+      "id": "last-known-good",
+      "name": "最后一次正确配置的备份",
+      "group": "系统备份与回滚",
+      "description": "Windows 目录下 lastgood 文件夹里的备份，供“最后一次正确的配置”启动选项回滚驱动和系统文件。",
+      "note": "删除后“最后一次正确的配置”无法再用这些文件回滚。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%SystemRoot%", "include": ["lastgood", "lastgood.tmp"] }]
+    },
+    {
+      "id": "hardlink-backup",
+      "name": "硬链接合并备份",
+      "group": "系统备份与回滚",
+      "description": "Dism++ 的硬链接合并功能在系统盘根目录留下的 $HardLinkBackup 备份。",
+      "note": "删除后硬链接合并无法回滚。先确认合并后系统一切正常。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%SystemDrive%/$HardLinkBackup" }]
+    },
+    {
+      "id": "package-cache",
+      "name": "Package Cache 安装源",
+      "group": "安装程序缓存",
+      "description": "基于 WiX 的安装程序（Visual Studio、VC++ 运行库、.NET SDK 等）在 ProgramData 下缓存的安装源。",
+      "note": "清理后这些程序的修复、升级、增删组件需要联网或准备安装包；部分程序在“应用和功能”里的卸载入口就是这里缓存的安装程序，删除后可能无法从那里卸载。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%ProgramData%/Package Cache" }]
+    },
+    {
+      "id": "installer-patch-cache",
+      "name": "Windows Installer 基线缓存",
+      "group": "安装程序缓存",
+      "description": "Windows Installer 为打补丁保存的原始文件基线（Installer 目录下的 $PatchCache$）。",
+      "note": "清理后卸载补丁或修复 Office、虚拟机软件等程序时可能需要原始安装包。原规则表在装有苹果软件（iTunes 等）的电脑上不提供这一项，这类电脑不要勾选。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%SystemRoot%/Installer/$PatchCache$" }]
+    },
+    {
+      "id": "msocache",
+      "name": "Office 本地安装源（MSOCache）",
+      "group": "安装程序缓存",
+      "description": "旧版 Office（MSI 安装）在系统盘根目录保存的本地安装源。",
+      "note": "删除后 Office 无法正常卸载，只能升级安装或强行删除；Office 2007 及更早版本安装更新也会受影响。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%SystemDrive%/MSOCache" }]
+    },
+    {
+      "id": "office-c2r-cache",
+      "name": "Office 即点即用安装源",
+      "group": "安装程序缓存",
+      "description": "Office 365、2016 及以后版本（即点即用安装）在 ProgramData 下保存的安装源，不含 MachineData 和 UserData。",
+      "note": "清理后 Office 可能无法正常卸载、修复或更新，需要用微软的 Office 卸载工具处理或重新下载安装。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%ProgramData%/Microsoft/ClickToRun", "exclude": ["MachineData", "UserData"] }]
+    },
+    {
+      "id": "webpi-cache",
+      "name": "Web 平台安装程序缓存",
+      "group": "安装程序缓存",
+      "description": "微软 Web 平台安装程序（WebPI）下载的安装包和缓存。",
+      "note": "WebPI 已停止服务，删除后这些安装包可能无法再下载；用它安装的组件修复时可能需要安装包。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%SystemDrive%/Users/*/AppData/Local/Microsoft/Web Platform Installer" }]
+    },
+    {
+      "id": "driver-extract-dirs",
+      "name": "驱动程序解压目录",
+      "group": "安装程序缓存",
+      "description": "Intel、AMD、NVIDIA 驱动安装时在系统盘根目录解压出的 AMD、Intel、NVIDIA 目录。",
+      "note": "这三个目录里的文件会全部删除，重新安装或修复驱动需要重新下载驱动包。如果你自己在系统盘根目录建了同名文件夹，不要勾选。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [
+        { "root": "%SystemDrive%/AMD" },
+        { "root": "%SystemDrive%/Intel" },
+        { "root": "%SystemDrive%/NVIDIA" }
+      ]
+    },
+    {
+      "id": "intel-driver-cache",
+      "name": "Intel 驱动安装源缓存",
+      "group": "安装程序缓存",
+      "description": "Intel 驱动安装后留在 ProgramData 下的安装源缓存。",
+      "note": "删除后卸载或修复 Intel 驱动可能需要重新下载驱动安装包。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%ProgramData%/Intel/Package Cache" }]
+    },
+    {
+      "id": "nvidia-installer-cache",
+      "name": "NVIDIA 驱动安装源缓存",
+      "group": "安装程序缓存",
+      "description": "NVIDIA 驱动安装程序（Installer2）保存的各组件安装源。",
+      "note": "“应用和功能”里 NVIDIA 各组件的卸载和修复要用到这里的文件，删除后可能无法从那里卸载，只能用新的驱动安装包覆盖安装。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [
+        { "root": "%ProgramFiles%/NVIDIA Corporation/Installer2" },
+        { "root": "%ProgramFiles(x86)%/NVIDIA Corporation/Installer2" },
+        { "root": "%SystemDrive%/Users/*/AppData/nvidia/nvbackend/packages" }
+      ]
+    },
+    {
+      "id": "nvidia-downloader",
+      "name": "NVIDIA 驱动安装包",
+      "group": "安装程序缓存",
+      "description": "NVIDIA GeForce Experience 更新驱动时下载的安装包。",
+      "note": "删除后重新安装或修复这一版驱动需要重新下载；原规则表提示可能影响 NVIDIA 驱动的卸载。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%ProgramData%/NVIDIA Corporation/Downloader" }]
+    },
+    {
+      "id": "realtek-audio-cache",
+      "name": "瑞昱声卡驱动安装源缓存",
+      "group": "安装程序缓存",
+      "description": "瑞昱（Realtek）声卡驱动安装后留在程序目录 Realtek/Audio 下各子目录里的安装源，不含 HDA 和 ASIO 目录。",
+      "note": "删除后卸载或修复瑞昱声卡驱动可能需要重新下载驱动包。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [
+        { "root": "%ProgramFiles%/Realtek/Audio", "include": ["*/*"], "exclude": ["HDA", "ASIO"] },
+        { "root": "%ProgramFiles(x86)%/Realtek/Audio", "include": ["*/*"], "exclude": ["HDA", "ASIO"] }
+      ]
+    },
+    {
+      "id": "java-install-cache",
+      "name": "Java 安装源缓存",
+      "group": "安装程序缓存",
+      "description": "Java 安装后留下的安装源缓存和临时安装目录。",
+      "note": "删除后卸载或修复 Java 可能需要重新下载安装包。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [
+        { "root": "%SystemDrive%/Users/*/AppData/Roaming/Oracle/Java/jre*.*.*_*" },
+        { "root": "%SystemDrive%/Users/*/AppData/Roaming/Oracle/Java/installcache" },
+        { "root": "%SystemDrive%/Users/*/AppData/Roaming/Oracle/Java/tmpinstall" }
+      ]
+    },
+    {
+      "id": "sql-server-setup-cache",
+      "name": "SQL Server 安装和更新缓存",
+      "group": "安装程序缓存",
+      "description": "SQL Server 安装补丁后留在 Setup Bootstrap 下的更新缓存（Update Cache）、安装日志（Log）和 SQL Server 2008 R2 的安装程序目录。",
+      "note": "删除后修复、卸载 SQL Server 或继续打补丁可能需要原始安装介质。SQLServer2008R2 目录是 2008 R2 的维护程序，删除后可能无法从“应用和功能”卸载或修复 2008 R2。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [
+        {
+          "root": "%ProgramFiles%/Microsoft SQL Server/*/Setup Bootstrap",
+          "include": ["Update Cache", "Log", "SQLServer2008R2"]
+        },
+        {
+          "root": "%ProgramFiles(x86)%/Microsoft SQL Server/*/Setup Bootstrap",
+          "include": ["Update Cache", "Log", "SQLServer2008R2"]
+        }
+      ]
+    },
+    {
+      "id": "acrobat-setup-files",
+      "name": "Adobe Acrobat 安装源缓存",
+      "group": "安装程序缓存",
+      "description": "Adobe Acrobat DC 安装后留下的安装文件（Setup Files）。",
+      "note": "删除后 Adobe Acrobat 可能无法正常卸载或修复，需要重新下载安装包。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [
+        { "root": "%ProgramFiles(x86)%/Adobe/Acrobat DC/Setup Files" },
+        { "root": "%ProgramFiles%/Adobe/Acrobat DC/Setup Files" }
+      ]
+    },
+    {
+      "id": "dotnet-mtp-setup-cache",
+      "name": ".NET 多目标包安装缓存",
+      "group": "安装程序缓存",
+      "description": "安装 .NET Framework 多目标包（Multi-Targeting Pack）及其补丁后留下的 SetupCache 目录。",
+      "note": "删除后修复或卸载这些 .NET 开发组件可能需要原始安装包。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [
+        { "root": "%ProgramFiles%/Microsoft.NET/Multi-Targeting Pack/*/SetupCache" },
+        { "root": "%ProgramFiles(x86)%/Microsoft.NET/Multi-Targeting Pack/*/SetupCache" }
+      ]
+    },
+    {
+      "id": "ms-pinyin-setup",
+      "name": "微软拼音安装文件",
+      "group": "安装程序缓存",
+      "description": "旧版微软拼音输入法的升级程序留在各用户 AppData/LocalLow/KunlunInput 下的安装文件。",
+      "note": "删除后修复或卸载这个版本的微软拼音时可能需要重新下载安装包。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%SystemDrive%/Users/*/AppData/LocalLow/KunlunInput" }]
+    },
+    {
+      "id": "nuget-packages",
+      "name": "NuGet 全局包缓存",
+      "group": "应用程序",
+      "description": "Visual Studio 和 dotnet 还原 NuGet 包时下载到当前用户 .nuget/packages 下的全局包缓存。",
+      "note": "删除后每个项目下次生成都要重新下载用到的全部包，可能有数 GB；离线或关闭了 NuGet 自动还原时生成会失败。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%USERPROFILE%/.nuget/packages" }]
+    },
+    {
+      "id": "debugger-symbol-cache",
+      "name": "调试符号缓存",
+      "group": "应用程序",
+      "description": "调试程序时下载的符号（PDB）缓存，位于当前用户的 AppData/Local/DBG。",
+      "note": "删除后下次调试要重新下载符号，第一次加载会很慢；目录里如果还有调试器的其他数据，也会一起删除。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%LOCALAPPDATA%/DBG" }]
+    },
+    {
+      "id": "intellitrace-cache",
+      "name": "Visual Studio 智能跟踪文件",
+      "group": "应用程序",
+      "description": "Visual Studio 2010 调试时留下的 IntelliTrace（智能跟踪）记录。",
+      "risk": "low",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%ProgramData%/Microsoft Visual Studio/10.0/TraceDebugging" }]
+    },
+    {
+      "id": "xde-cache",
+      "name": "Windows Phone 模拟器缓存",
+      "group": "应用程序",
+      "description": "Windows Phone 开发时模拟器（XDE）保存的虚拟机状态文件。",
+      "note": "删除后模拟器要重新初始化，模拟器里的快照、已部署的应用和数据都会丢失；不建议频繁清理。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [
+        { "root": "%ProgramData%/Microsoft/XDE" },
+        { "root": "%SystemDrive%/Users/*/AppData/Local/Microsoft/XDE" }
+      ]
+    },
+    {
+      "id": "vs-settings-logs",
+      "name": "Visual Studio 设置日志",
+      "group": "应用程序",
+      "description": "Visual Studio 加载和同步设置时写下的日志。",
+      "risk": "low",
+      "default_selected": false,
+      "kind": "files",
+      "min_age_hours": 24,
+      "targets": [{ "root": "%SystemDrive%/Users/*/AppData/Local/Microsoft/VisualStudio/SettingsLogs" }]
+    },
+    {
+      "id": "qq-temp",
+      "name": "QQ 临时数据和日志",
+      "group": "应用程序",
+      "description": "QQ 运行时产生的临时文件和日志，以及 QQ 手机助手组件（AndroidAssist、AndroidServer）。不影响聊天记录。",
+      "note": "除临时文件和日志外，还会删除 QQ 手机助手组件和系统账户下的整个腾讯数据目录，这些组件下次使用时要重新下载。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "min_age_hours": 24,
+      "targets": [
+        {
+          "root": "%SystemDrive%/Users/*/AppData/Roaming/Tencent",
+          "include": ["AndroidAssist", "AndroidServer", "Logs", "TXSSO/SetupLogs", "TXSSO/SSOTemp"]
+        },
+        { "root": "%SystemDrive%/Users/*/AppData/Roaming/Tencent/Users/*/WinTemp/*" },
+        { "root": "%SystemRoot%/SysWOW64/config/systemprofile/AppData/Roaming/Tencent" }
+      ]
+    },
+    {
+      "id": "yy-temp",
+      "name": "YY 语音临时文件",
+      "group": "应用程序",
+      "description": "YY 语音运行时产生的日志和缓存。",
+      "risk": "low",
+      "default_selected": false,
+      "kind": "files",
+      "min_age_hours": 24,
+      "targets": [{ "root": "%SystemDrive%/Users/*/AppData/Roaming/duowan/yy", "include": ["log", "Cache"] }]
+    },
+    {
+      "id": "baidu-netdisk-logs",
+      "name": "百度网盘日志",
+      "group": "应用程序",
+      "description": "百度网盘客户端和传输内核运行时写下的日志。",
+      "risk": "low",
+      "default_selected": false,
+      "kind": "files",
+      "min_age_hours": 24,
+      "targets": [
+        { "root": "%APPDATA%/BaiduYunKernel/Data" },
+        { "root": "%APPDATA%/BaiduYunGuanjia/logs" }
+      ]
+    },
+    {
+      "id": "fetion-data",
+      "name": "飞信数据目录",
+      "group": "应用程序",
+      "description": "飞信在当前用户 AppData/Roaming/FetionV5 下的整个数据目录，原规则表称之为飞信日志。",
+      "note": "清理的是整个 FetionV5 目录而不只是日志，其中可能有聊天记录和账号设置，删除后无法恢复。飞信已停止服务，确认不再需要这些记录再勾选。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%APPDATA%/FetionV5" }]
+    },
+    {
+      "id": "avira-temp",
+      "name": "小红伞升级残留",
+      "group": "应用程序",
+      "description": "小红伞（Avira）自动升级时在 ProgramData/Avira 下各产品目录里留下的 TEMP 和 BACKUP 目录。",
+      "note": "BACKUP 目录按原规则表的说法是升级残留，删除后其中的备份无法恢复。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%ProgramData%/Avira/*", "include": ["TEMP", "BACKUP"] }]
+    },
+    {
+      "id": "itunes-backup",
+      "name": "iTunes 设备备份",
+      "group": "应用程序",
+      "description": "iTunes 在电脑上保存的 iPhone、iPad 备份，包括通讯录、照片、视频等。",
+      "note": "这是设备的完整备份，删除后无法恢复。现在需要用它恢复设备，或者它是唯一的备份时，不要勾选。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%SystemDrive%/Users/*/AppData/Roaming/Apple Computer/MobileSync/Backup" }]
     },
     {
       "id": "recycle-bin",
