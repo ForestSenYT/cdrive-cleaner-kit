@@ -113,6 +113,9 @@ public sealed class MainViewModel : ObservableObject
 
     public bool CanScan => IsIdle && Rules is not null;
 
+    /// <summary>A scan has finished in this window. Until then the only action offered is to start one.</summary>
+    public bool HasScanned => _scan is not null;
+
     public bool CanClean => IsIdle && _scan is not null && !_scanOutdated && SelectedBytes + SelectedRecycleItems > 0;
 
     public string Status
@@ -264,10 +267,12 @@ public sealed class MainViewModel : ObservableObject
         Selected = Items.FirstOrDefault();
         Raise(nameof(CanScan));
         RefreshDrive(morph: false);
+        Status = "点“开始扫描”查看哪些文件可以清理。扫描只读取，不会删除任何文件。";
         return true;
     }
 
-    public async Task ScanAsync(bool morph = false)
+    /// <summary>Scans with the loaded rules. The drive strip morphs to the result, so a scan shows what it found.</summary>
+    public async Task ScanAsync()
     {
         if (Rules is not { } rules || !IsIdle)
         {
@@ -297,8 +302,8 @@ public sealed class MainViewModel : ObservableObject
                 item.BarFraction = item.Bytes / largest;
             }
 
-            RefreshDrive(morph);
-            Raise(nameof(EmptyCount), nameof(HasEmpty), nameof(EmptyToggleText));
+            RefreshDrive(morph: true);
+            Raise(nameof(HasScanned), nameof(EmptyCount), nameof(HasEmpty), nameof(EmptyToggleText));
             ReleaseScanGarbage();
             double seconds = (DateTime.UtcNow - started).TotalSeconds;
             Status = $"扫描完成，用时 {seconds:0.0} 秒。可清理 {_scan.TotalFiles:N0} 个文件，共 {ByteSize.Format(_scan.TotalBytes)}。"
@@ -372,7 +377,7 @@ public sealed class MainViewModel : ObservableObject
         ResultText = (report.Cancelled ? "清理中途取消。" : "清理完成。")
             + $"释放了 {ByteSize.Format(report.TotalDeletedBytes)}，删除 {report.TotalDeletedFiles:N0} 个文件。"
             + (failed > 0 ? $"{failed:N0} 个文件正在使用或没有权限，留在原处。" : "");
-        await ScanAsync(morph: true);
+        await ScanAsync();
         if (!_scanOutdated)
         {
             Status = ResultText;

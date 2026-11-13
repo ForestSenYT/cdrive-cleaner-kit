@@ -8,9 +8,12 @@ namespace CDriveCleaner.App;
 /// <summary>
 /// Starts the window with the rule set shipped next to the executable. <c>--rules &lt;file&gt;</c> loads another rule
 /// file instead; it exists for verification against test fixtures, and the window marks such a file.
+/// <c>--scan</c> starts scanning once the window is up; without it the user starts the scan.
 /// </summary>
 public partial class App : Application
 {
+    public const string ScanSwitch = "--scan";
+
     public static string ShippedRulesPath => Path.Combine(AppContext.BaseDirectory, "rules", "rules.json");
 
     /// <summary>Where an unexpected error is written before the window says what happened.</summary>
@@ -55,7 +58,8 @@ public partial class App : Application
         }
 
         bool shipped = string.Equals(rulesPath, ShippedRulesPath, StringComparison.OrdinalIgnoreCase);
-        MainWindow = new MainWindow(rulesPath, shipped);
+        bool scanAtStart = e.Args.Contains(ScanSwitch, StringComparer.OrdinalIgnoreCase);
+        MainWindow = new MainWindow(rulesPath, shipped, scanAtStart);
         MainWindow.Show();
     }
 

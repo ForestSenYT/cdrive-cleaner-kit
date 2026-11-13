@@ -53,7 +53,7 @@
                     <TextBlock Text="{Binding FilesText}" Style="{StaticResource Secondary}" HorizontalAlignment="Right" Margin="0,1,0,0" />
                     <Border Height="3" Width="112" CornerRadius="1.5" Margin="0,5,0,0" HorizontalAlignment="Right"
                             Background="{DynamicResource DividerStrokeColorDefaultBrush}"
-                            Visibility="{Binding IsEmpty, Converter={StaticResource Hidden}}">
+                            Visibility="{Binding ShowsBar, Converter={StaticResource Shown}}">
                         <Rectangle RadiusX="1.5" RadiusY="1.5" Fill="{Binding Group.Brush}" RenderTransformOrigin="1,0.5">
                             <Rectangle.RenderTransform>
                                 <ScaleTransform ScaleX="{Binding BarFraction}" />
@@ -145,8 +145,8 @@
                             ToolTip="{Binding RulesPath}">
                         <TextBlock Style="{StaticResource RiskTagText}" Text="{Binding RulesFileName, StringFormat=测试用规则：{0}}" />
                     </Border>
-                    <Button x:Name="AdminButton" Content="以管理员身份重新扫描" Click="AdminButton_Click"
-                            ToolTip="系统文件夹（Windows 日志、更新缓存、其他用户的临时文件等）需要管理员权限才能读取和清理"
+                    <Button x:Name="AdminButton" Content="以管理员身份扫描" Click="AdminButton_Click"
+                            ToolTip="以管理员身份重新打开并立即扫描。系统文件夹（Windows 日志、更新缓存、其他用户的临时文件等）需要管理员权限才能读取和清理。"
                             Visibility="{Binding IsElevated, Converter={StaticResource Hidden}}"
                             IsEnabled="{Binding IsIdle}" />
                     <TextBlock Text="管理员" Style="{StaticResource Secondary}" VerticalAlignment="Center"
@@ -325,13 +325,20 @@
             <!-- Status on the left, the actions on the right. -->
             <DockPanel Grid.Row="3" Margin="0,16,0,0">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <TextBlock Text="{Binding SelectionText}" Style="{StaticResource Secondary}" FontSize="13" VerticalAlignment="Center" Margin="0,0,16,0"
-                               Visibility="{Binding IsIdle, Converter={StaticResource Shown}}" />
-                    <Button x:Name="ScanButton" Content="重新扫描" Click="ScanButton_Click" IsEnabled="{Binding CanScan}"
-                            Visibility="{Binding IsIdle, Converter={StaticResource Shown}}" />
-                    <Button x:Name="CleanButton" Style="{StaticResource AccentButtonStyle}" Content="{Binding CleanButtonText}"
-                            Click="CleanButton_Click" IsEnabled="{Binding CanClean}" Margin="8,0,0,0" MinWidth="120"
-                            Visibility="{Binding IsIdle, Converter={StaticResource Shown}}" AutomationProperties.AutomationId="CleanButton" />
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsIdle, Converter={StaticResource Shown}}">
+                        <!-- Nothing is scanned until asked: before the first scan, starting one is the only action. -->
+                        <Button x:Name="StartScanButton" Style="{StaticResource AccentButtonStyle}" Content="开始扫描" MinWidth="120"
+                                Click="ScanButton_Click" IsEnabled="{Binding CanScan}" AutomationProperties.AutomationId="StartScanButton"
+                                Visibility="{Binding HasScanned, Converter={StaticResource Hidden}}" />
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding HasScanned, Converter={StaticResource Shown}}">
+                            <TextBlock Text="{Binding SelectionText}" Style="{StaticResource Secondary}" FontSize="13" VerticalAlignment="Center" Margin="0,0,16,0" />
+                            <Button x:Name="ScanButton" Content="重新扫描" Click="ScanButton_Click" IsEnabled="{Binding CanScan}"
+                                    AutomationProperties.AutomationId="ScanButton" />
+                            <Button x:Name="CleanButton" Style="{StaticResource AccentButtonStyle}" Content="{Binding CleanButtonText}"
+                                    Click="CleanButton_Click" IsEnabled="{Binding CanClean}" Margin="8,0,0,0" MinWidth="120"
+                                    AutomationProperties.AutomationId="CleanButton" />
+                        </StackPanel>
+                    </StackPanel>
                     <Button x:Name="CancelButton" Content="取消" Click="CancelButton_Click" MinWidth="88"
                             Visibility="{Binding IsBusy, Converter={StaticResource Shown}}" />
                 </StackPanel>

@@ -9,7 +9,7 @@ namespace CDriveCleaner.App.Controls;
 /// <param name="SelectedBytes">The part of it the user has ticked.</param>
 public sealed record CapacitySegment(Color Color, double Bytes, double SelectedBytes);
 
-/// <param name="Morph">True when the change should animate from the previous state (after a clean).</param>
+/// <param name="Morph">True when the change should animate from the previous state (after a scan).</param>
 public sealed record CapacitySnapshot(double Total, double Used, IReadOnlyList<CapacitySegment> Segments, bool Morph = false)
 {
     public static CapacitySnapshot Empty { get; } = new(0, 0, []);
@@ -17,8 +17,9 @@ public sealed record CapacitySnapshot(double Total, double Used, IReadOnlyList<C
 
 /// <summary>
 /// The system drive as one strip: space used by everything else, then each category's cleanable space, the ticked
-/// part last and striped (it is about to become free), then free space. When a clean finishes the strip morphs from
-/// the old layout to the new one, so the reclaimed space visibly joins the free part.
+/// part last and striped (it is about to become free), then free space. When a scan finishes the strip morphs from
+/// the old layout to the new one: the first scan splits the used space into categories, and the scan after a clean
+/// lets the reclaimed space visibly join the free part.
 /// </summary>
 public sealed class CapacityBar : FrameworkElement
 {

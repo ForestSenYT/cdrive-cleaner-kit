@@ -15,7 +15,11 @@ public partial class MainWindow : Window
     private readonly MainViewModel _model;
     private bool _closeRequested;
 
-    public MainWindow(string rulesPath, bool shippedRules)
+    /// <param name="scanAtStart">
+    /// Scan as soon as the window is up. Only the "scan as administrator" relaunch asks for it, because clicking that
+    /// button already was the request to scan; otherwise nothing is scanned until the user starts it.
+    /// </param>
+    public MainWindow(string rulesPath, bool shippedRules, bool scanAtStart)
     {
         InitializeComponent();
         _model = new MainViewModel(rulesPath, shippedRules);
@@ -25,12 +29,19 @@ public partial class MainWindow : Window
         rules.Filter += (_, e) => e.Accepted = e.Item is RuleItem item && (_model.ShowEmpty || !item.IsEmpty);
         ContentRendered += async (_, _) =>
         {
-            // Scanning only reads, so the window scans as soon as it is on screen and the user starts from real numbers.
-            // Waiting for the first frame keeps the scan's progress updates from delaying it.
-            if (_model.LoadRules())
+            // Loading after the first frame keeps the window's appearance quick.
+            if (!_model.LoadRules())
             {
-                RuleList.Focus();
-                await _model.ScanAsync();
+                return;
+            }
+
+            if (scanAtStart)
+            {
+                await ScanAndFocusList();
+            }
+            else
+            {
+                StartScanButton.Focus();
             }
         };
         // Space on a highlighted row ticks it, as it would on the check box itself. Preview, because the list box
@@ -83,7 +94,26 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void ScanButton_Click(object sender, RoutedEventArgs e) => await _model.ScanAsync();
+    private async void ScanButton_Click(object sender, RoutedEventArgs e) => await ScanAndFocusList();
+
+    /// <summary>The scan hides the button that started it, so afterwards the focus goes where the choosing happens.</summary>
+    private async Task ScanAndFocusList()
+    {
+        await _model.ScanAsync();
+        if (_closeRequested)
+        {
+            return;
+        }
+
+        if (_model.HasScanned)
+        {
+            RuleList.Focus();
+        }
+        else
+        {
+            StartScanButton.Focus();
+        }
+    }
 
     private void CancelButton_Click(object sender, RoutedEventArgs e) => _model.Cancel();
 
@@ -144,10 +174,10 @@ public partial class MainWindow : Window
 
     private void AdminButton_Click(object sender, RoutedEventArgs e)
     {
-        var start = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = true, Verb = "runas" };
+        var start = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = true, Verb = "runas", Arguments = App.ScanSwitch };
         if (!_model.ShippedRules)
         {
-            start.Arguments = $"--rules \"{_model.RulesPath}\"";
+            start.Arguments += $" --rules \"{_model.RulesPath}\"";
         }
 
         try

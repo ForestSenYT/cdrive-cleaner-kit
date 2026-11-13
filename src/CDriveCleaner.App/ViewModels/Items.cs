@@ -43,14 +43,15 @@ public sealed class GroupItem : ObservableObject
         }
     }
 
-    public string BytesText => ByteSize.Format(Bytes);
+    /// <summary>Empty until a scan: before one, "0 B" would read as "nothing found".</summary>
+    public string BytesText => Rules.Any(rule => rule.IsScanned) ? ByteSize.Format(Bytes) : "";
 
     public long SelectedBytes => Rules.Where(rule => rule.IsChecked).Sum(rule => rule.EffectiveBytes);
 
     public void Refresh()
     {
         Bytes = Rules.Sum(rule => rule.EffectiveBytes);
-        Raise(nameof(SelectedBytes));
+        Raise(nameof(SelectedBytes), nameof(BytesText));
     }
 }
 
@@ -123,6 +124,9 @@ public sealed class RuleItem : ObservableObject
 
     /// <summary>Scanned, nothing to free on this computer, and nothing to warn about either.</summary>
     public bool IsEmpty => _scan is { Files: 0, Bytes: 0, Warnings.Count: 0 };
+
+    /// <summary>The size bar is drawn once there is a size to compare; before a scan it would only be an empty track.</summary>
+    public bool ShowsBar => IsScanned && !IsEmpty;
 
     public long Files => _scan?.Files ?? 0;
 
@@ -300,7 +304,7 @@ public sealed class RuleItem : ObservableObject
     }
 
     private void RaiseAll() => Raise(
-        nameof(Scan), nameof(IsScanned), nameof(IsEmpty), nameof(Files), nameof(Bytes), nameof(KeptFiles), nameof(KeptBytes),
+        nameof(Scan), nameof(IsScanned), nameof(IsEmpty), nameof(ShowsBar), nameof(Files), nameof(Bytes), nameof(KeptFiles), nameof(KeptBytes),
         nameof(EffectiveFiles), nameof(EffectiveBytes), nameof(SizeText), nameof(FilesText), nameof(StatsText),
         nameof(SkippedText), nameof(HasSkipped), nameof(WarningLines), nameof(HasWarnings), nameof(Sources),
         nameof(HasSources), nameof(StatusText), nameof(HasStatus));
