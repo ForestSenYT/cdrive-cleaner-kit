@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CDriveCleaner.App/CDriveCleaner.App.csproj" />
+    <Project Path="src/CDriveCleaner.Cli/CDriveCleaner.Cli.csproj" />
+    <Project Path="src/CDriveCleaner.Core/CDriveCleaner.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CDriveCleaner.Tests/CDriveCleaner.Tests.csproj" />
+  </Folder>
+</Solution>

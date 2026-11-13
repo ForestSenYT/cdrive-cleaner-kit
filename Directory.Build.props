@@ -1,0 +1,22 @@
+<Project>
+  <!-- Shared by every project. SPEC section 10: the cleaner must run as a 64-bit process,
+       otherwise System32 is redirected to SysWOW64 and rule paths point at the wrong place. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!-- The default rule set ships unchanged from the kit (PROMPT.md: "原样随产品发布"). -->
+  <ItemGroup Condition="'$(ShipRules)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)cdrive-cleaner-kit\rules\rules.json" Link="rules\rules.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)cdrive-cleaner-kit\rules\rules.schema.json" Link="rules\rules.schema.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

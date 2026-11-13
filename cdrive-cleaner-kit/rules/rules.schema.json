@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Cleaner rule file (format 1)",
+  "description": "Structural schema. SPEC.md section 2 adds checks a schema cannot express: unique ids and path segment rules.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "rules"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "format": { "const": 1 },
+    "rules": { "type": "array", "items": { "$ref": "#/$defs/rule" } }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "group", "kind"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "name": { "type": "string", "minLength": 1 },
+        "group": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "note": { "type": "string" },
+        "risk": { "enum": ["low", "medium"] },
+        "default_selected": { "type": "boolean" },
+        "kind": { "enum": ["files", "recycle_bin"] },
+        "min_age_hours": { "type": "number", "minimum": 0 },
+        "targets": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/target" } }
+      },
+      "if": { "properties": { "kind": { "const": "files" } }, "required": ["kind"] },
+      "then": { "properties": { "targets": true }, "required": ["targets"] },
+      "else": { "properties": { "targets": false, "min_age_hours": false } }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root"],
+      "properties": {
+        "root": { "type": "string", "minLength": 1 },
+        "include": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "exclude": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    }
+  }
+}

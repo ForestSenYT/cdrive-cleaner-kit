@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>CDriveCleaner</AssemblyName>
+    <RootNamespace>CDriveCleaner.App</RootNamespace>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationVisualStyles>true</ApplicationVisualStyles>
+    <ApplicationDefaultFont>Microsoft YaHei UI, 9pt</ApplicationDefaultFont>
+    <ShipRules>true</ShipRules>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CDriveCleaner.Core\CDriveCleaner.Core.csproj" />
+  </ItemGroup>
+
+</Project>
