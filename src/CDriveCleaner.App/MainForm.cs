@@ -13,7 +13,6 @@ namespace CDriveCleaner.App;
 /// </summary>
 internal sealed class MainForm : Form
 {
-    private const int ColumnName = 0;
     private const int ColumnFiles = 1;
     private const int ColumnSize = 2;
     private const int ColumnRisk = 3;
@@ -24,7 +23,6 @@ internal sealed class MainForm : Form
     private readonly Button _scanButton = new() { Text = "扫描", AutoSize = true };
     private readonly Button _cleanButton = new() { Text = "清理所选…", AutoSize = true };
     private readonly Button _cancelButton = new() { Text = "取消", AutoSize = true };
-    private readonly Button _openButton = new() { Text = "打开规则文件…", AutoSize = true };
     private readonly Label _rulesLabel = new() { AutoSize = true, AutoEllipsis = true };
     private readonly ListView _list = new()
     {
@@ -51,16 +49,19 @@ internal sealed class MainForm : Form
     private readonly ToolStripStatusLabel _statusText = new() { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
     private readonly ToolStripProgressBar _progress = new() { Visible = false, Minimum = 0, Maximum = 100 };
 
-    private string _rulesPath;
+    private readonly string _rulesPath;
+    private readonly bool _shippedRules;
     private RuleSet? _rules;
     private ScanReport? _scan;
     private CleanReport? _clean;
     private CancellationTokenSource? _cancellation;
     private bool _closeRequested;
 
-    public MainForm(string rulesPath)
+    /// <param name="shippedRules">False when <c>--rules</c> pointed somewhere else; the window then says so.</param>
+    public MainForm(string rulesPath, bool shippedRules)
     {
         _rulesPath = rulesPath;
+        _shippedRules = shippedRules;
         Text = Texts.AppTitle;
         AutoScaleMode = AutoScaleMode.Dpi;
         StartPosition = FormStartPosition.CenterScreen;
@@ -75,7 +76,7 @@ internal sealed class MainForm : Form
         _list.Columns.Add("状态", LogicalToDeviceUnits(220));
 
         var toolbar = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = false };
-        toolbar.Controls.AddRange([_scanButton, _cleanButton, _cancelButton, _openButton]);
+        toolbar.Controls.AddRange([_scanButton, _cleanButton, _cancelButton]);
 
         _split.Panel1.Controls.Add(_list);
         _split.Panel2.Controls.Add(_details);
@@ -109,7 +110,6 @@ internal sealed class MainForm : Form
         _scanButton.Click += async (_, _) => await ScanAsync();
         _cleanButton.Click += async (_, _) => await CleanAsync();
         _cancelButton.Click += (_, _) => RequestCancel();
-        _openButton.Click += (_, _) => ChooseRuleFile();
         _list.ItemCheck += (_, e) =>
         {
             if (_cancellation is not null)
@@ -133,7 +133,7 @@ internal sealed class MainForm : Form
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
-        LoadRules(_rulesPath);
+        LoadRules();
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
@@ -155,21 +155,20 @@ internal sealed class MainForm : Form
         return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
     }
 
-    private void LoadRules(string path)
+    /// <summary>
+    /// Rule files are trusted input that ships with the product (SPEC section 10), so the window offers no way to
+    /// pick another one; <c>--rules</c> exists for verification against test fixtures.
+    /// </summary>
+    private void LoadRules()
     {
-        _scan = null;
-        _clean = null;
+        string origin = _shippedRules ? "" : "（不是随程序发布的规则文件）";
         try
         {
-            _rules = RuleFileLoader.Load(path);
-            _rulesPath = path;
+            _rules = RuleFileLoader.Load(_rulesPath);
         }
         catch (RuleFileException error)
         {
-            _rules = null;
-            _list.Items.Clear();
-            _list.Groups.Clear();
-            _rulesLabel.Text = $"规则文件：{path}（已拒绝）";
+            _rulesLabel.Text = $"规则文件：{_rulesPath}{origin}（已拒绝）";
             SetStatus("规则文件被拒绝，没有做任何扫描。");
             MessageBox.Show(this, $"规则文件被拒绝，没有做任何扫描：{Environment.NewLine}{error.Message}",
                 Texts.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -177,25 +176,16 @@ internal sealed class MainForm : Form
             return;
         }
 
-        _rulesLabel.Text = $"规则文件：{path}";
+        _rulesLabel.Text = $"规则文件：{_rulesPath}{origin}";
+        if (!_shippedRules)
+        {
+            _rulesLabel.ForeColor = Texts.MediumRiskColor;
+        }
+
         ShowRules();
         string elevation = IsElevated() ? "" : "当前不是管理员身份，部分系统目录读不到，会按空目录处理。";
         SetStatus($"已加载 {_rules.Rules.Count} 条规则，点击“扫描”开始。{elevation}");
         UpdateButtons();
-    }
-
-    private void ChooseRuleFile()
-    {
-        using var dialog = new OpenFileDialog
-        {
-            Title = "选择规则文件",
-            Filter = "规则文件 (*.json)|*.json|所有文件 (*.*)|*.*",
-            FileName = _rulesPath,
-        };
-        if (dialog.ShowDialog(this) == DialogResult.OK)
-        {
-            LoadRules(dialog.FileName);
-        }
     }
 
     private void ShowRules()
@@ -363,7 +353,7 @@ internal sealed class MainForm : Form
         _list.BeginUpdate();
         foreach (ListViewItem item in _list.Items)
         {
-            var result = clean.Rules.FirstOrDefault(rule => rule.Rule.Id == item.Name);
+            var result = clean.Find(item.Name);
             item.SubItems[ColumnStatus].Text = result is null
                 ? (item.Checked && clean.Cancelled ? "已取消，未处理" : "")
                 : $"已删除 {result.DeletedFiles:N0} 个（{ByteSize.Format(result.DeletedBytes)}），失败 {result.Failed.Count:N0} 个";
@@ -405,12 +395,11 @@ internal sealed class MainForm : Form
             text.AppendLine();
             foreach (var warning in scanned.Warnings)
             {
-                string where = warning.Target is { } target ? $"目标 {target + 1}" : "回收站";
-                text.AppendLine($"  警告（{where}）：{Texts.Warning(warning.Code)}  {warning.Detail}");
+                text.AppendLine($"  警告（{warning.Location}）：{Texts.Warning(warning.Code)}  {warning.Detail}");
             }
         }
 
-        if (_clean?.Rules.FirstOrDefault(result => result.Rule.Id == rule.Id) is { } cleaned)
+        if (_clean?.Find(rule.Id) is { } cleaned)
         {
             text.AppendLine($"清理：已删除 {cleaned.DeletedFiles:N0} 个文件，{ByteSize.Format(cleaned.DeletedBytes)}；失败 {cleaned.Failed.Count:N0} 个");
             foreach (var failure in cleaned.Failed.Take(MaxListedFailures))
@@ -477,7 +466,6 @@ internal sealed class MainForm : Form
         _scanButton.Enabled = !busy && _rules is not null;
         _cleanButton.Enabled = !busy && _scan is not null && _clean is null;
         _cancelButton.Enabled = busy;
-        _openButton.Enabled = !busy;
     }
 
     private void SetStatus(string text) => _statusText.Text = text;

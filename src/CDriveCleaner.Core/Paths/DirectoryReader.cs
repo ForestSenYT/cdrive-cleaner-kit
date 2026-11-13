@@ -42,6 +42,21 @@ internal static class DirectoryReader
     }
 
     /// <summary>
+    /// Full paths of the child directories whose names match <paramref name="pattern"/>. Reparse points are skipped
+    /// silently: a wildcard never leads through a link or junction.
+    /// </summary>
+    public static IEnumerable<string> MatchingSubdirectories(string directory, SegmentPattern pattern)
+    {
+        foreach (var entry in List(directory))
+        {
+            if (entry.IsDirectory && !entry.IsReparsePoint && pattern.Matches(entry.Name))
+            {
+                yield return PathText.Join(directory, entry.Name);
+            }
+        }
+    }
+
+    /// <summary>
     /// Looks up one literal child name. The entry comes back with its on-disk spelling, so an 8.3 alias or a
     /// different letter case resolves to the real long name. Returns null when nothing by that name exists.
     /// </summary>

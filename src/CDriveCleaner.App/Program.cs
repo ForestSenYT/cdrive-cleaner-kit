@@ -3,8 +3,8 @@ namespace CDriveCleaner.App;
 internal static class Program
 {
     /// <summary>
-    /// Starts the window. <c>--rules &lt;file&gt;</c> picks another rule file; by default the rule set shipped
-    /// next to the executable is used.
+    /// Starts the window with the rule set shipped next to the executable. <c>--rules &lt;file&gt;</c> loads another
+    /// rule file instead; it is meant for verification against test fixtures, and the window marks it as such.
     /// </summary>
     [STAThread]
     private static int Main(string[] args)
@@ -16,7 +16,8 @@ internal static class Program
             return 1;
         }
 
-        string rulesPath = Path.Combine(AppContext.BaseDirectory, "rules", "rules.json");
+        string shippedPath = Path.Combine(AppContext.BaseDirectory, "rules", "rules.json");
+        string rulesPath = shippedPath;
         for (int index = 0; index + 1 < args.Length; index++)
         {
             if (args[index] == "--rules")
@@ -25,7 +26,8 @@ internal static class Program
             }
         }
 
-        Application.Run(new MainForm(rulesPath));
+        bool shippedRules = string.Equals(rulesPath, shippedPath, StringComparison.OrdinalIgnoreCase);
+        Application.Run(new MainForm(rulesPath, shippedRules));
         return 0;
     }
 }

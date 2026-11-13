@@ -8,9 +8,11 @@ internal static class PathText
 
     private static readonly char[] InvalidNameCharacters = Path.GetInvalidFileNameChars();
 
+    /// <summary>'/' becomes '\' and trailing separators are dropped, so <c>C:/x/</c> and <c>C:\x</c> read the same.</summary>
+    public static string Normalize(string path) => path.Replace('/', Separator).TrimEnd(Separator);
+
     /// <summary>Splits a rule path into segments: '/' and '\' are equivalent, trailing separators are ignored.</summary>
-    public static string[] Segments(string text) =>
-        text.Replace('/', Separator).TrimEnd(Separator).Split(Separator);
+    public static string[] Segments(string text) => Normalize(text).Split(Separator);
 
     /// <summary>Empty, "." and ".." segments are never allowed (SPEC sections 2 and 3).</summary>
     public static bool IsBadSegment(string segment) => segment is "" or "." or "..";
@@ -31,4 +33,8 @@ internal static class PathText
     /// </summary>
     public static string Extended(string path) =>
         path.StartsWith(ExtendedPrefix, StringComparison.Ordinal) ? path : ExtendedPrefix + path;
+
+    /// <summary>The plain <c>X:\...</c> form of a path an operating-system call returned in extended-length form.</summary>
+    public static string WithoutExtendedPrefix(string path) =>
+        path.StartsWith(ExtendedPrefix, StringComparison.Ordinal) ? path[ExtendedPrefix.Length..] : path;
 }

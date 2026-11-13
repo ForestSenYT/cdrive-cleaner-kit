@@ -29,14 +29,14 @@ internal sealed class ProtectedDirectories
         {
             foreach (string name in SystemSubdirectories)
             {
-                result.Add(PathText.Join(Normalize(systemRoot), name));
+                result.Add(PathText.Join(PathText.Normalize(systemRoot), name));
             }
         }
 
         string? systemDrive = Environment.GetEnvironmentVariable("SystemDrive");
         if (!string.IsNullOrEmpty(systemDrive))
         {
-            result.Add(Normalize(systemDrive) + PathText.Separator + "Users");
+            result.Add(PathText.Normalize(systemDrive) + PathText.Separator + "Users");
         }
 
         return result;
@@ -44,7 +44,7 @@ internal sealed class ProtectedDirectories
 
     public bool Contains(string path)
     {
-        string normalized = Normalize(path);
+        string normalized = PathText.Normalize(path);
         return PathText.IsDriveSegment(normalized) || _paths.Contains(normalized);
     }
 
@@ -55,15 +55,13 @@ internal sealed class ProtectedDirectories
             return;
         }
 
-        string normalized = Normalize(path);
+        string normalized = PathText.Normalize(path);
         _paths.Add(normalized);
 
         // Scanned paths always carry long names; make an 8.3-style variable value compare equal to them too.
         if (Win32.LongPath(PathText.Extended(normalized)) is { } longPath)
         {
-            _paths.Add(Normalize(longPath.StartsWith(@"\\?\", StringComparison.Ordinal) ? longPath[4..] : longPath));
+            _paths.Add(PathText.Normalize(PathText.WithoutExtendedPrefix(longPath)));
         }
     }
-
-    private static string Normalize(string path) => path.Replace('/', PathText.Separator).TrimEnd(PathText.Separator);
 }

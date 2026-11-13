@@ -12,8 +12,12 @@ public static class WarningCodes
     public const string RecycleBinQueryFailed = "recycle_bin_query_failed";
 }
 
-/// <param name="Target">Index of the target inside the rule; null for the recycle bin rule.</param>
-public sealed record ScanWarning(string Code, int? Target, string Detail);
+/// <param name="TargetIndex">Zero-based index of the target inside the rule (the JSON <c>target</c>); null for the recycle bin rule.</param>
+public sealed record ScanWarning(string Code, int? TargetIndex, string Detail)
+{
+    /// <summary>Where the warning comes from, worded for people: targets are numbered from 1.</summary>
+    public string Location => TargetIndex is { } index ? $"目标 {index + 1}" : "回收站";
+}
 
 public sealed record ScannedFile(string Path, long Size);
 

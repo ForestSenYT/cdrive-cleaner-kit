@@ -26,8 +26,7 @@ internal static class TextReport
 
                 foreach (var warning in result.Warnings)
                 {
-                    string where = warning.Target is { } target ? $"目标 {target}" : "回收站";
-                    output.WriteLine($"      警告 {warning.Code}（{where}）：{warning.Detail}");
+                    output.WriteLine($"      警告 {warning.Code}（{warning.Location}）：{warning.Detail}");
                 }
 
                 if (listPaths)

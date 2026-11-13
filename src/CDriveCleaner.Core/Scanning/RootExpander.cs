@@ -54,13 +54,7 @@ internal static partial class RootExpander
                 var pattern = SegmentPattern.Parse(segment);
                 foreach (string directory in current)
                 {
-                    foreach (var entry in DirectoryReader.List(directory))
-                    {
-                        if (entry.IsDirectory && !entry.IsReparsePoint && pattern.Matches(entry.Name))
-                        {
-                            following.Add(PathText.Join(directory, entry.Name));
-                        }
-                    }
+                    following.AddRange(DirectoryReader.MatchingSubdirectories(directory, pattern));
                 }
             }
             else

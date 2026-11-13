@@ -46,6 +46,9 @@ public sealed class CleanReport
     public long TotalDeletedFiles => Rules.Sum(rule => rule.DeletedFiles);
 
     public long TotalDeletedBytes => Rules.Sum(rule => rule.DeletedBytes);
+
+    /// <summary>The result for one rule, or null when that rule was not selected.</summary>
+    public RuleCleanResult? Find(string id) => Rules.FirstOrDefault(result => result.Rule.Id == id);
 }
 
 /// <param name="Processed">Files handled so far across all selected rules.</param>

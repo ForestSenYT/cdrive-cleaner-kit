@@ -46,13 +46,7 @@ internal sealed class TargetResolver
                 foreach (string directory in parents)
                 {
                     _cancellation.ThrowIfCancellationRequested();
-                    foreach (var entry in DirectoryReader.List(directory))
-                    {
-                        if (entry.IsDirectory && !entry.IsReparsePoint && segment.Matches(entry.Name))
-                        {
-                            following.Add(PathText.Join(directory, entry.Name));
-                        }
-                    }
+                    following.AddRange(DirectoryReader.MatchingSubdirectories(directory, segment));
                 }
 
                 parents = following;

@@ -9,23 +9,11 @@ namespace CDriveCleaner.Core.Scanning;
 /// </summary>
 public sealed class Scanner
 {
-    private readonly Func<DateTime> _utcNow;
-
-    public Scanner()
-        : this(() => DateTime.UtcNow)
-    {
-    }
-
-    internal Scanner(Func<DateTime> utcNow)
-    {
-        _utcNow = utcNow;
-    }
-
     public ScanReport Scan(RuleSet rules, IProgress<ScanProgress>? progress = null, CancellationToken cancellation = default)
     {
         var protectedDirectories = ProtectedDirectories.FromEnvironment();
         var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        DateTime now = _utcNow();
+        DateTime now = DateTime.UtcNow;
         var results = new List<RuleScanResult>(rules.Rules.Count);
 
         for (int index = 0; index < rules.Rules.Count; index++)

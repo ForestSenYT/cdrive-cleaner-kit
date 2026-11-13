@@ -19,8 +19,6 @@ internal sealed class SegmentPattern
     /// <summary>The segment consists of nothing but '*' characters.</summary>
     public bool IsAllStars { get; }
 
-    public bool HasWildcard => _parts is not null;
-
     public string Text => _text;
 
     public static SegmentPattern Parse(string segment) => new(segment);

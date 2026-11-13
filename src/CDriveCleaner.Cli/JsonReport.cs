@@ -36,7 +36,7 @@ internal static class JsonReport
             {
                 writer.WriteStartObject();
                 writer.WriteString("code", warning.Code);
-                if (warning.Target is { } target)
+                if (warning.TargetIndex is { } target)
                 {
                     writer.WriteNumber("target", target);
                 }

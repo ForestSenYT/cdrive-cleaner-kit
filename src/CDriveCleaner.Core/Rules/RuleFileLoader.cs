@@ -136,7 +136,9 @@ public static class RuleFileLoader
             };
         }
 
-        if (kindText == "recycle_bin")
+        RuleKind kind = RuleKindNames.FromJsonName(kindText)
+            ?? throw Reject($"{where}：未知的 kind \"{kindText}\"（只能是 files 或 recycle_bin）");
+        if (kind == RuleKind.RecycleBin)
         {
             if (fields.ContainsKey("targets") || fields.ContainsKey("min_age_hours"))
             {
@@ -144,11 +146,6 @@ public static class RuleFileLoader
             }
 
             return new Rule(id, name, group, RuleKind.RecycleBin, description, note, risk, defaultSelected, 0, []);
-        }
-
-        if (kindText != "files")
-        {
-            throw Reject($"{where}：未知的 kind \"{kindText}\"（只能是 files 或 recycle_bin）");
         }
 
         double minAgeHours = 0;
