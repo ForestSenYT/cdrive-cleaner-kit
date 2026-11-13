@@ -6,6 +6,7 @@
     <AssemblyName>CDriveCleaner</AssemblyName>
     <RootNamespace>CDriveCleaner.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <ShipRules>true</ShipRules>
     <!-- Application.ThemeMode (the built-in Fluent theme) is still marked experimental in .NET 10. -->
     <NoWarn>$(NoWarn);WPF0001</NoWarn>
@@ -13,6 +14,10 @@
     <PublishReadyToRun>true</PublishReadyToRun>
     <TieredPGO>true</TieredPGO>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="app.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\CDriveCleaner.Core\CDriveCleaner.Core.csproj" />
