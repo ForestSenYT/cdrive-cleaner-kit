@@ -26,6 +26,11 @@ public sealed class RuleCleanResult
 
     public long DeletedBytes { get; internal set; }
 
+    /// <summary>Files the user chose to keep (see <see cref="CleanExclusions"/>); they were not touched.</summary>
+    public long KeptFiles { get; internal set; }
+
+    public long KeptBytes { get; internal set; }
+
     public List<CleanFailure> Failed { get; } = [];
 }
 

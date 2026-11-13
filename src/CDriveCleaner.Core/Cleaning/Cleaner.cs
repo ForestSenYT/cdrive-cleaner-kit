@@ -16,17 +16,20 @@ public sealed class Cleaner
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
 
     /// <param name="selectedIds">Ids of rules the user selected and confirmed; every id must be in <paramref name="scan"/>.</param>
+    /// <param name="exclusions">Files to leave alone inside the selected rules; none when null (the command line never keeps any).</param>
     public CleanReport Clean(
         ScanReport scan, IReadOnlySet<string> selectedIds, IProgress<CleanProgress>? progress = null,
-        CancellationToken cancellation = default)
+        CancellationToken cancellation = default, CleanExclusions? exclusions = null)
     {
+        exclusions ??= CleanExclusions.None;
         var selected = scan.Rules.Where(result => selectedIds.Contains(result.Rule.Id)).ToList();
         if (selected.Count != selectedIds.Count)
         {
             throw new ArgumentException("所选规则不在本次扫描结果中。", nameof(selectedIds));
         }
 
-        long total = selected.Where(r => r.Rule.Kind == RuleKind.Files).Sum(r => (long)r.FileList.Count);
+        long total = selected.Where(r => r.Rule.Kind == RuleKind.Files)
+            .Sum(r => (long)r.FileList.Count(file => !exclusions.Keeps(r.Rule.Id, file.Path)));
         long processed = 0;
         var clock = Stopwatch.StartNew();
         var results = new List<RuleCleanResult>(selected.Count);
@@ -56,6 +59,13 @@ public sealed class Cleaner
                 {
                     cancelled = true;
                     break;
+                }
+
+                if (exclusions.Keeps(scanned.Rule.Id, file.Path))
+                {
+                    result.KeptFiles++;
+                    result.KeptBytes += file.Size;
+                    continue;
                 }
 
                 string? error = DeleteOne(file.Path, out long size);

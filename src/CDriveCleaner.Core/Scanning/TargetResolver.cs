@@ -7,6 +7,9 @@ internal readonly record struct FoundFile(string Path, long Size, DateTime LastW
 /// <summary>The files one concrete root selects (SPEC section 4).</summary>
 internal sealed class TargetResolver
 {
+    /// <summary>Directories of one tree level are listed concurrently; listing is I/O-bound.</summary>
+    private static readonly int WalkParallelism = Math.Clamp(Environment.ProcessorCount, 2, 8);
+
     private readonly ProtectedDirectories _protected;
     private readonly Action<string, string> _warn;
     private readonly CancellationToken _cancellation;
@@ -19,16 +22,13 @@ internal sealed class TargetResolver
     }
 
     /// <summary>Everything below <paramref name="root"/> when there is no include pattern, otherwise what each pattern selects.</summary>
-    public IEnumerable<FoundFile> Resolve(string root, IReadOnlyList<SegmentPattern[]> include)
+    public List<FoundFile> Resolve(string root, IReadOnlyList<SegmentPattern[]> include)
     {
+        var found = new List<FoundFile>();
         if (include.Count == 0)
         {
-            foreach (var file in WalkGuarded(root))
-            {
-                yield return file;
-            }
-
-            yield break;
+            WalkGuarded(root, found);
+            return found;
         }
 
         foreach (var pattern in include)
@@ -64,60 +64,97 @@ internal sealed class TargetResolver
                     }
 
                     string child = PathText.Join(directory, entry.Name);
-                    if (!entry.IsDirectory)
+                    if (entry.IsDirectory)
                     {
-                        yield return new FoundFile(child, entry.Length, entry.LastWriteUtc);
-                        continue;
+                        WalkGuarded(child, found);
                     }
-
-                    foreach (var file in WalkGuarded(child))
+                    else
                     {
-                        yield return file;
+                        found.Add(new FoundFile(child, entry.Length, entry.LastWriteUtc));
                     }
                 }
             }
         }
+
+        return found;
     }
 
     /// <summary>
     /// Every regular file below <paramref name="top"/>. Reparse points are neither entered nor reported, and a
-    /// protected directory is never walked, whether it is the starting point or met on the way down.
+    /// protected directory is never walked, whether it is the starting point or met on the way down. The tree is
+    /// walked level by level with the directories of a level listed concurrently; the protected directories met on
+    /// the way are reported in path order, so the result does not depend on timing.
     /// </summary>
-    private IEnumerable<FoundFile> WalkGuarded(string top)
+    private void WalkGuarded(string top, List<FoundFile> found)
     {
         if (_protected.Contains(top))
         {
             _warn(WarningCodes.ProtectedRoot, top);
-            yield break;
+            return;
         }
 
-        var pending = new Stack<string>();
-        pending.Push(top);
-        while (pending.Count > 0)
+        var refused = new List<string>();
+        var gate = new object();
+        var options = new ParallelOptions { MaxDegreeOfParallelism = WalkParallelism, CancellationToken = _cancellation };
+        var level = new List<string> { top };
+        while (level.Count > 0)
         {
-            _cancellation.ThrowIfCancellationRequested();
-            string directory = pending.Pop();
-            foreach (var entry in DirectoryReader.List(directory))
-            {
-                if (entry.IsReparsePoint)
+            var next = new List<string>();
+            Parallel.ForEach(
+                level,
+                options,
+                () => new Listing(),
+                (directory, _, listing) =>
                 {
-                    continue;
-                }
+                    foreach (var entry in DirectoryReader.List(directory))
+                    {
+                        if (entry.IsReparsePoint)
+                        {
+                            continue;
+                        }
 
-                string child = PathText.Join(directory, entry.Name);
-                if (!entry.IsDirectory)
+                        string child = PathText.Join(directory, entry.Name);
+                        if (!entry.IsDirectory)
+                        {
+                            listing.Files.Add(new FoundFile(child, entry.Length, entry.LastWriteUtc));
+                        }
+                        else if (_protected.Contains(child))
+                        {
+                            listing.Refused.Add(child);
+                        }
+                        else
+                        {
+                            listing.Directories.Add(child);
+                        }
+                    }
+
+                    return listing;
+                },
+                listing =>
                 {
-                    yield return new FoundFile(child, entry.Length, entry.LastWriteUtc);
-                }
-                else if (_protected.Contains(child))
-                {
-                    _warn(WarningCodes.ProtectedRoot, child);
-                }
-                else
-                {
-                    pending.Push(child);
-                }
-            }
+                    lock (gate)
+                    {
+                        found.AddRange(listing.Files);
+                        next.AddRange(listing.Directories);
+                        refused.AddRange(listing.Refused);
+                    }
+                });
+            level = next;
         }
+
+        refused.Sort(StringComparer.OrdinalIgnoreCase);
+        foreach (string directory in refused)
+        {
+            _warn(WarningCodes.ProtectedRoot, directory);
+        }
+    }
+
+    private sealed class Listing
+    {
+        public List<FoundFile> Files { get; } = [];
+
+        public List<string> Directories { get; } = [];
+
+        public List<string> Refused { get; } = [];
     }
 }

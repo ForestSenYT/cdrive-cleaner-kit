@@ -240,8 +240,8 @@ internal sealed class MainForm : Form
                 return;
             }
 
-            SetStatus($"正在扫描：{report.Rule.Name}（{report.RuleIndex + 1}/{report.RuleCount}）");
-            _progress.Value = report.RuleIndex * 100 / report.RuleCount;
+            SetStatus($"正在扫描（{report.Completed}/{report.RuleCount}）：{report.Rule.Name}");
+            _progress.Value = report.Completed * 100 / report.RuleCount;
         });
 
         try
