@@ -1,0 +1,79 @@
+{
+  "format": 1,
+  "rules": [
+    {
+      "id": "whole-root",
+      "name": "whole root with age filter",
+      "group": "fixture",
+      "kind": "files",
+      "min_age_hours": 24,
+      "targets": [{ "root": "%CLEANKIT_FIXTURE%/temp" }]
+    },
+    {
+      "id": "overlap",
+      "name": "same root as an earlier rule",
+      "group": "fixture",
+      "kind": "files",
+      "targets": [{ "root": "%CLEANKIT_FIXTURE%/temp" }]
+    },
+    {
+      "id": "pattern",
+      "name": "include patterns",
+      "group": "fixture",
+      "kind": "files",
+      "targets": [{ "root": "%CLEANKIT_FIXTURE%/logs", "include": ["*.log", "app_*/*.log"] }]
+    },
+    {
+      "id": "wild-root",
+      "name": "wildcard inside the root",
+      "group": "fixture",
+      "kind": "files",
+      "targets": [{ "root": "%CLEANKIT_FIXTURE%/users/*/cache" }]
+    },
+    {
+      "id": "exclude",
+      "name": "two exclude patterns",
+      "group": "fixture",
+      "kind": "files",
+      "targets": [{ "root": "%CLEANKIT_FIXTURE%/cachex", "exclude": ["keep", "drop/*.cfg"] }]
+    },
+    {
+      "id": "case",
+      "name": "case-insensitive matching",
+      "group": "fixture",
+      "kind": "files",
+      "targets": [{ "root": "%CLEANKIT_FIXTURE%/CASE", "include": ["*.log"] }]
+    },
+    {
+      "id": "dirmatch",
+      "name": "literal include naming a directory and a file",
+      "group": "fixture",
+      "kind": "files",
+      "targets": [{ "root": "%CLEANKIT_FIXTURE%/dirmatch", "include": ["Minidump", "MEMORY.DMP"] }]
+    },
+    {
+      "id": "unresolved",
+      "name": "unknown environment variable",
+      "group": "fixture",
+      "kind": "files",
+      "targets": [{ "root": "%CLEANKIT_NO_SUCH_VAR%/x" }]
+    },
+    {
+      "id": "missing",
+      "name": "root that does not exist",
+      "group": "fixture",
+      "kind": "files",
+      "targets": [{ "root": "%CLEANKIT_FIXTURE%/does-not-exist" }]
+    },
+    {
+      "id": "protected",
+      "name": "protected directories are refused",
+      "group": "fixture",
+      "kind": "files",
+      "targets": [
+        { "root": "%SystemDrive%/" },
+        { "root": "%SystemRoot%", "include": ["*"] }
+      ]
+    }
+  ]
+}

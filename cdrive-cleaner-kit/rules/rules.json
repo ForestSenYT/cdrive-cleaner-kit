@@ -1,0 +1,171 @@
+{
+  "$schema": "./rules.schema.json",
+  "format": 1,
+  "rules": [
+    {
+      "id": "user-temp",
+      "name": "当前用户临时文件",
+      "group": "临时文件",
+      "description": "程序运行和安装时留在用户临时目录里的文件。",
+      "risk": "low",
+      "default_selected": true,
+      "kind": "files",
+      "min_age_hours": 24,
+      "targets": [{ "root": "%TEMP%" }]
+    },
+    {
+      "id": "system-temp",
+      "name": "系统临时文件",
+      "group": "临时文件",
+      "description": "系统服务和安装程序留在 Windows 临时目录里的文件。",
+      "risk": "low",
+      "default_selected": true,
+      "kind": "files",
+      "min_age_hours": 24,
+      "targets": [{ "root": "%SystemRoot%/Temp" }]
+    },
+    {
+      "id": "service-temp",
+      "name": "服务账户临时文件",
+      "group": "临时文件",
+      "description": "系统服务账户各自临时目录里的文件。",
+      "risk": "low",
+      "default_selected": true,
+      "kind": "files",
+      "min_age_hours": 24,
+      "targets": [
+        { "root": "%SystemRoot%/ServiceProfiles/*/AppData/Local/Temp" },
+        { "root": "%SystemRoot%/System32/config/systemprofile/AppData/Local/Temp" },
+        { "root": "%SystemRoot%/SysWOW64/config/systemprofile/AppData/Local/Temp" }
+      ]
+    },
+    {
+      "id": "store-app-temp",
+      "name": "应用商店应用临时文件",
+      "group": "临时文件",
+      "description": "应用商店应用在各自沙盒临时目录里留下的文件。",
+      "risk": "low",
+      "default_selected": true,
+      "kind": "files",
+      "min_age_hours": 24,
+      "targets": [{ "root": "%SystemDrive%/Users/*/AppData/Local/Packages/*/AC/Temp" }]
+    },
+    {
+      "id": "error-reports",
+      "name": "Windows 错误报告",
+      "group": "日志与报告",
+      "description": "程序和系统出错时生成的报告及内核实时转储。",
+      "note": "正在排查崩溃或蓝屏问题时先保留。",
+      "risk": "low",
+      "default_selected": true,
+      "kind": "files",
+      "targets": [
+        { "root": "%ProgramData%/Microsoft/Windows/WER" },
+        { "root": "%SystemDrive%/Users/*/AppData/Local/Microsoft/Windows/WER" },
+        { "root": "%SystemRoot%/LiveKernelReports" }
+      ]
+    },
+    {
+      "id": "windows-logs",
+      "name": "Windows 日志文件",
+      "group": "日志与报告",
+      "description": "系统安装、更新和诊断过程写下的日志。",
+      "risk": "low",
+      "default_selected": true,
+      "kind": "files",
+      "min_age_hours": 24,
+      "targets": [
+        { "root": "%SystemRoot%", "include": ["*.log", "Panther/*.log", "Performance/WinSAT/*.log"] },
+        { "root": "%SystemRoot%/Logs" },
+        { "root": "%SystemRoot%/debug" },
+        { "root": "%ProgramData%/USOShared/Logs" }
+      ]
+    },
+    {
+      "id": "crash-dumps",
+      "name": "崩溃转储文件",
+      "group": "日志与报告",
+      "description": "系统蓝屏和程序崩溃时保存的内存转储。",
+      "note": "需要分析蓝屏或崩溃原因时先保留。",
+      "risk": "low",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [
+        { "root": "%SystemRoot%", "include": ["MEMORY.DMP", "Minidump"] },
+        { "root": "%SystemDrive%/Users/*/AppData/Local/CrashDumps" }
+      ]
+    },
+    {
+      "id": "inet-cache",
+      "name": "系统网页缓存",
+      "group": "缓存",
+      "description": "系统网络组件（WinINet）为各账户保存的网页缓存。",
+      "risk": "low",
+      "default_selected": true,
+      "kind": "files",
+      "targets": [
+        { "root": "%SystemDrive%/Users/*/AppData/Local/Microsoft/Windows/INetCache" },
+        { "root": "%SystemRoot%/ServiceProfiles/*/AppData/Local/Microsoft/Windows/INetCache" },
+        { "root": "%SystemDrive%/Users/*/AppData/Local/Packages/*/AC/INetCache" }
+      ]
+    },
+    {
+      "id": "rdp-cache",
+      "name": "远程桌面位图缓存",
+      "group": "缓存",
+      "description": "远程桌面客户端为加快显示保存的位图缓存。",
+      "risk": "low",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%SystemDrive%/Users/*/AppData/Local/Microsoft/Terminal Server Client/Cache" }]
+    },
+    {
+      "id": "thumbnail-cache",
+      "name": "缩略图和图标缓存",
+      "group": "缓存",
+      "description": "资源管理器保存的缩略图和图标缓存数据库。",
+      "note": "资源管理器运行时这些文件多数被占用，会被自动跳过。",
+      "risk": "low",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [
+        {
+          "root": "%SystemDrive%/Users/*/AppData/Local/Microsoft/Windows/Explorer",
+          "include": ["thumbcache_*.db", "iconcache_*.db"]
+        }
+      ]
+    },
+    {
+      "id": "prefetch",
+      "name": "预读取文件",
+      "group": "缓存",
+      "description": "系统为加快程序启动记录的预读取数据。",
+      "note": "清理后各程序第一次启动会变慢，系统会自动重建。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%SystemRoot%/Prefetch" }]
+    },
+    {
+      "id": "update-download",
+      "name": "Windows 更新下载缓存",
+      "group": "缓存",
+      "description": "Windows 更新已下载的安装包。",
+      "note": "正在下载或等待安装的更新会重新下载。",
+      "risk": "medium",
+      "default_selected": false,
+      "kind": "files",
+      "targets": [{ "root": "%SystemRoot%/SoftwareDistribution/Download" }]
+    },
+    {
+      "id": "recycle-bin",
+      "name": "回收站",
+      "group": "回收站",
+      "description": "系统盘回收站里的全部内容。",
+      "note": "清空后无法恢复。",
+      "risk": "low",
+      "default_selected": false,
+      "kind": "recycle_bin"
+    }
+  ]
+}
