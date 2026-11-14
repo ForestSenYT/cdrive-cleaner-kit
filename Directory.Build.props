@@ -14,6 +14,15 @@
     <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
   </PropertyGroup>
 
+  <!-- The release version: file properties, the installer and the release file names all take it from here. -->
+  <PropertyGroup>
+    <Version>1.0.0</Version>
+    <Product>C 盘清理</Product>
+    <Company>ForestSenYT</Company>
+    <Copyright>Copyright © 2026 ForestSenYT</Copyright>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
   <!-- The default rule set ships unchanged from the kit (PROMPT.md: "原样随产品发布"). -->
   <ItemGroup Condition="'$(ShipRules)' == 'true'">
     <None Include="$(MSBuildThisFileDirectory)cdrive-cleaner-kit\rules\rules.json" Link="rules\rules.json" CopyToOutputDirectory="PreserveNewest" />

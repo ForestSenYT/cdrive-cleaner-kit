@@ -232,7 +232,10 @@ public sealed class MainViewModel : ObservableObject
     {
         try
         {
-            Rules = RuleFileLoader.Load(RulesPath);
+            // The portable single-file build has no rules folder next to it and uses the compiled-in copy.
+            Rules = ShippedRules && !File.Exists(RulesPath)
+                ? RuleFileLoader.Parse(ShippedRuleFile.Embedded())
+                : RuleFileLoader.Load(RulesPath);
         }
         catch (RuleFileException error)
         {

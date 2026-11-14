@@ -14,8 +14,6 @@ public partial class App : Application
 {
     public const string ScanSwitch = "--scan";
 
-    public static string ShippedRulesPath => Path.Combine(AppContext.BaseDirectory, "rules", "rules.json");
-
     /// <summary>Where an unexpected error is written before the window says what happened.</summary>
     public static string CrashLogPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CDriveCleaner", "error.log");
@@ -48,7 +46,7 @@ public partial class App : Application
             return;
         }
 
-        string rulesPath = ShippedRulesPath;
+        string rulesPath = ShippedRuleFile.Path;
         for (int index = 0; index + 1 < e.Args.Length; index++)
         {
             if (e.Args[index] == "--rules")
@@ -57,7 +55,7 @@ public partial class App : Application
             }
         }
 
-        bool shipped = string.Equals(rulesPath, ShippedRulesPath, StringComparison.OrdinalIgnoreCase);
+        bool shipped = string.Equals(rulesPath, ShippedRuleFile.Path, StringComparison.OrdinalIgnoreCase);
         bool scanAtStart = e.Args.Contains(ScanSwitch, StringComparer.OrdinalIgnoreCase);
         MainWindow = new MainWindow(rulesPath, shipped, scanAtStart);
         MainWindow.Show();
