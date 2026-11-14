@@ -2,14 +2,26 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
     <AssemblyName>CDriveCleaner</AssemblyName>
+    <!-- Shown as the file description, and so in Task Manager. -->
+    <AssemblyTitle>C 盘清理</AssemblyTitle>
     <RootNamespace>CDriveCleaner.App</RootNamespace>
-    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <ApplicationVisualStyles>true</ApplicationVisualStyles>
-    <ApplicationDefaultFont>Microsoft YaHei UI, 9pt</ApplicationDefaultFont>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <ShipRules>true</ShipRules>
+    <!-- Application.ThemeMode (the built-in Fluent theme) is still marked experimental in .NET 10. -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
+    <!-- Precompiled code starts noticeably faster; it only applies to dotnet publish. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <TieredPGO>true</TieredPGO>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="app.ico" />
+    <!-- The same rule file, compiled in for the portable single-file build (see ShippedRuleFile). -->
+    <EmbeddedResource Include="..\..\cdrive-cleaner-kit\rules\rules.json" LogicalName="rules.json" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\CDriveCleaner.Core\CDriveCleaner.Core.csproj" />

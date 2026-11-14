@@ -7,28 +7,46 @@ namespace CDriveCleaner.Core.Scanning;
 /// Read-only scan (SPEC sections 3 to 6). Nothing is created, changed, deleted or opened: whether a file is in use
 /// is decided one file at a time during clean.
 /// </summary>
+/// <remarks>
+/// Rules are matched in parallel, each on its own, because matching one rule never depends on another. Ownership
+/// (SPEC section 5) is then settled in rule-file order on one thread, so the report is the same as a sequential scan.
+/// </remarks>
 public sealed class Scanner
 {
+    /// <summary>Directory listing is I/O-bound; a few concurrent rules keep an SSD busy without flooding a hard disk.</summary>
+    private static readonly int Parallelism = Math.Clamp(Environment.ProcessorCount, 2, 6);
+
     public ScanReport Scan(RuleSet rules, IProgress<ScanProgress>? progress = null, CancellationToken cancellation = default)
     {
         var protectedDirectories = ProtectedDirectories.FromEnvironment();
-        var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         DateTime now = DateTime.UtcNow;
-        var results = new List<RuleScanResult>(rules.Rules.Count);
+        int count = rules.Rules.Count;
+        var matches = new RuleMatches[count];
+        int completed = 0;
 
-        for (int index = 0; index < rules.Rules.Count; index++)
+        var options = new ParallelOptions { MaxDegreeOfParallelism = Parallelism, CancellationToken = cancellation };
+        Parallel.For(0, count, options, index =>
+        {
+            var rule = rules.Rules[index];
+            matches[index] = rule.Kind == RuleKind.RecycleBin
+                ? RuleMatches.Empty
+                : Collect(rule, protectedDirectories, cancellation);
+            progress?.Report(new ScanProgress(Interlocked.Increment(ref completed), count, rule));
+        });
+
+        var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var results = new List<RuleScanResult>(count);
+        for (int index = 0; index < count; index++)
         {
             cancellation.ThrowIfCancellationRequested();
-            var rule = rules.Rules[index];
-            progress?.Report(new ScanProgress(index, rules.Rules.Count, rule));
-            var result = new RuleScanResult(rule);
-            if (rule.Kind == RuleKind.RecycleBin)
+            var result = new RuleScanResult(rules.Rules[index]);
+            if (result.Rule.Kind == RuleKind.RecycleBin)
             {
                 ScanRecycleBin(result);
             }
             else
             {
-                ScanFiles(result, protectedDirectories, claimed, now, cancellation);
+                Claim(result, matches[index], claimed, now);
             }
 
             results.Add(result);
@@ -50,18 +68,17 @@ public sealed class Scanner
         }
     }
 
-    private static void ScanFiles(
-        RuleScanResult result, ProtectedDirectories protectedDirectories, HashSet<string> claimed, DateTime now,
-        CancellationToken cancellation)
+    /// <summary>Everything one rule's targets select, before ownership and age are considered.</summary>
+    private static RuleMatches Collect(Rule rule, ProtectedDirectories protectedDirectories, CancellationToken cancellation)
     {
-        var rule = result.Rule;
-        var matched = new Dictionary<string, FoundFile>(StringComparer.OrdinalIgnoreCase);
+        var matched = new Dictionary<string, ScannedFile>(StringComparer.OrdinalIgnoreCase);
+        var warnings = new List<ScanWarning>();
 
         for (int targetIndex = 0; targetIndex < rule.Targets.Count; targetIndex++)
         {
             var target = rule.Targets[targetIndex];
             int index = targetIndex;
-            void Warn(string code, string detail) => result.Warnings.Add(new ScanWarning(code, index, detail));
+            void Warn(string code, string detail) => warnings.Add(new ScanWarning(code, index, detail));
 
             var missing = new List<string>();
             string expanded = RootExpander.ExpandVariables(target.Root, missing);
@@ -77,20 +94,25 @@ public sealed class Scanner
 
             foreach (string root in RootExpander.Resolve(expanded, Warn, cancellation))
             {
-                string prefix = root.EndsWith(PathText.Separator) ? root : root + PathText.Separator;
+                int prefixLength = root.EndsWith(PathText.Separator) ? root.Length : root.Length + 1;
                 foreach (var file in resolver.Resolve(root, include))
                 {
-                    string[] relative = file.Path[prefix.Length..].Split(PathText.Separator);
-                    if (!IsExcluded(relative, exclude))
+                    if (exclude.Count == 0 || !IsExcluded(file.Path[prefixLength..].Split(PathText.Separator), exclude))
                     {
-                        matched.TryAdd(file.Path, file);
+                        matched.TryAdd(file.Path, new ScannedFile(file.Path, file.Size, root, file.LastWriteUtc));
                     }
                 }
             }
         }
 
-        double minimumAgeHours = rule.MinAgeHours;
-        foreach (var file in matched.Values.OrderBy(file => file.Path, StringComparer.OrdinalIgnoreCase))
+        return new RuleMatches(matched, warnings);
+    }
+
+    private static void Claim(RuleScanResult result, RuleMatches matches, HashSet<string> claimed, DateTime now)
+    {
+        result.Warnings.AddRange(matches.Warnings);
+        double minimumAgeHours = result.Rule.MinAgeHours;
+        foreach (var file in matches.Files.Values.OrderBy(file => file.Path, StringComparer.OrdinalIgnoreCase))
         {
             // The first rule that selects a file owns it, whatever that rule's own filters then decide (SPEC section 5).
             if (!claimed.Add(file.Path))
@@ -106,7 +128,7 @@ public sealed class Scanner
 
             result.Files++;
             result.Bytes += file.Size;
-            result.FileList.Add(new ScannedFile(file.Path, file.Size));
+            result.FileList.Add(file);
         }
     }
 
@@ -133,5 +155,10 @@ public sealed class Scanner
         }
 
         return false;
+    }
+
+    private sealed record RuleMatches(Dictionary<string, ScannedFile> Files, List<ScanWarning> Warnings)
+    {
+        public static RuleMatches Empty { get; } = new(new Dictionary<string, ScannedFile>(), []);
     }
 }

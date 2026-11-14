@@ -19,7 +19,11 @@ public sealed record ScanWarning(string Code, int? TargetIndex, string Detail)
     public string Location => TargetIndex is { } index ? $"目标 {index + 1}" : "回收站";
 }
 
-public sealed record ScannedFile(string Path, long Size);
+/// <param name="Path">Full path, as the clean will delete it.</param>
+/// <param name="Size">Size from the directory listing.</param>
+/// <param name="Root">The concrete root directory the file was found under (one expansion of a target's <c>root</c>).</param>
+/// <param name="LastWriteUtc">Last modification time from the directory listing.</param>
+public sealed record ScannedFile(string Path, long Size, string Root, DateTime LastWriteUtc);
 
 /// <summary>What one rule found. <see cref="FileList"/> is the deletion list a later clean works from (SPEC section 7).</summary>
 public sealed class RuleScanResult
@@ -59,5 +63,7 @@ public sealed class ScanReport
     public RuleScanResult? Find(string id) => Rules.FirstOrDefault(result => result.Rule.Id == id);
 }
 
-/// <param name="RuleIndex">Zero-based index of the rule being scanned.</param>
-public sealed record ScanProgress(int RuleIndex, int RuleCount, Rule Rule);
+/// <param name="Completed">How many rules have been matched so far (rules are matched in parallel).</param>
+/// <param name="RuleCount">Number of rules in the scan.</param>
+/// <param name="Rule">The rule that just finished.</param>
+public sealed record ScanProgress(int Completed, int RuleCount, Rule Rule);
